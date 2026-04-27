@@ -59,10 +59,17 @@ jobs:
       # ── Rolling deploy to Container Apps ──────────────────────────────────
       - name: Deploy to Container Apps
         run: |
+          # Build secrets list
+          SECRETS="google-api-key=${{ secrets.GOOGLE_API_KEY }}"
+          if [ -n "${{ secrets.LANGCHAIN_API_KEY }}" ]; then
+            SECRETS="$SECRETS,langchain-api-key=${{ secrets.LANGCHAIN_API_KEY }}"
+          fi
+
           az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }}
+            --image ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }} \
+            --secrets "$SECRETS"
 
       # ── Smoke test the live endpoint ──────────────────────────────────────
       - name: Smoke test health endpoint
