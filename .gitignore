@@ -11,3 +11,7 @@ wheels/
 .env
 .vscode
 .claude/
+
+# Local-only documents — not for version control
+linkedin_post.md
+presentation_script.md
