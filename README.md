@@ -2,8 +2,8 @@
 
 > Automatically classify scanned insurance documents — bills, KYC identity proofs, prescriptions, lab reports and more — using a three-stage pipeline: filename rules → OCR → Gemini LLM.
 
-[![CI](https://github.com/your-org/multimodal-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/multimodal-ai/actions/workflows/ci.yml)
-[![Deploy](https://github.com/your-org/multimodal-ai/actions/workflows/deploy.yml/badge.svg)](https://github.com/your-org/multimodal-ai/actions/workflows/deploy.yml)
+[![CI](https://github.com/sriny3/medishield-document-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/sriny3/medishield-document-classifier/actions/workflows/ci.yml)
+[![Deploy](https://github.com/sriny3/medishield-document-classifier/actions/workflows/deploy.yml/badge.svg)](https://github.com/sriny3/medishield-document-classifier/actions/workflows/deploy.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136-green)
 ![Tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
@@ -203,7 +203,7 @@ multimodal-ai/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-org/multimodal-ai.git
+git clone https://github.com/sriny3/medishield-document-classifier.git
 cd multimodal-ai
 uv sync
 ```
