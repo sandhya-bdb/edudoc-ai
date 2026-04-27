@@ -54,11 +54,13 @@ jobs:
       # ── Build & push image to ACR ─────────────────────────────────────────
       - name: Build and push image to ACR
         run: |
-          az acr build \
-            --registry ${{ env.ACR_NAME }} \
-            --image classifier:${{ env.IMAGE_TAG }} \
-            --image classifier:latest \
-            .
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query "passwords[0].value" -o tsv)
+          echo "$ACR_PASSWORD" | docker login ${{ env.ACR_NAME }}.azurecr.io \
+            --username ${{ env.ACR_NAME }} --password-stdin
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }} \
+                       -t ${{ env.ACR_NAME }}.azurecr.io/classifier:latest .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/classifier:latest
 
       # ── Rolling deploy to Container Apps ──────────────────────────────────
       - name: Deploy to Container Apps
