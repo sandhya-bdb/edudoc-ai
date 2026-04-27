@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediShield Document Classifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      max-width: 900px;
+      margin: 0 auto 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #2b6cb0;
+    }
+
+    header p {
+      margin-top: 0.25rem;
+      font-size: 0.95rem;
+      color: #4a5568;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      padding: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto 1.5rem;
+    }
+
+    /* ── Drop Zone ── */
+    #drop-zone {
+      border: 2px dashed #90cdf4;
+      border-radius: 10px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      background: #ebf8ff;
+    }
+
+    #drop-zone.drag-over {
+      background: #bee3f8;
+      border-color: #3182ce;
+    }
+
+    #drop-zone svg { color: #3182ce; margin-bottom: .75rem; }
+
+    #drop-zone p { font-size: 1rem; color: #2c5282; font-weight: 500; }
+    #drop-zone span { font-size: 0.85rem; color: #718096; }
+
+    #file-input { display: none; }
+
+    /* ── Preview Grid ── */
+    #preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: .75rem;
+      margin-top: 1.25rem;
+    }
+
+    .preview-item {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .preview-item img {
+      width: 100%;
+      height: 90px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .preview-item .preview-name {
+      font-size: 0.7rem;
+      padding: .25rem .4rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #4a5568;
+    }
+
+    .preview-item .remove-btn {
+      position: absolute;
+      top: 4px; right: 4px;
+      background: rgba(0,0,0,.5);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 20px; height: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    /* ── Actions ── */
+    .actions {
+      display: flex;
+      gap: .75rem;
+      margin-top: 1.25rem;
+      align-items: center;
+    }
+
+    #classify-btn {
+      background: #3182ce;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .6rem 1.4rem;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    #classify-btn:hover:not(:disabled) { background: #2c5282; }
+    #classify-btn:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    #clear-btn {
+      background: none;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      padding: .6rem 1.1rem;
+      font-size: .9rem;
+      color: #4a5568;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    #clear-btn:hover { background: #edf2f7; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: .4rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results Table ── */
+    #results-section { display: none; }
+
+    #results-section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #2d3748;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: .6rem .75rem;
+      background: #f7fafc;
+      border-bottom: 2px solid #e2e8f0;
+      color: #4a5568;
+      font-weight: 600;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    tbody tr { border-bottom: 1px solid #edf2f7; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f7fafc; }
+
+    td { padding: .6rem .75rem; vertical-align: middle; }
+
+    .filename-cell {
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: monospace;
+      font-size: .82rem;
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 9999px;
+      font-size: .78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-bill    { background: #ebf8ff; color: #2b6cb0; }
+    .badge-kyc     { background: #fffaf0; color: #c05621; }
+    .badge-image   { background: #f0fff4; color: #276749; }
+    .badge-rules   { background: #faf5ff; color: #6b46c1; }
+    .badge-ocr     { background: #fff5f5; color: #c53030; }
+    .badge-llm     { background: #ebfaf5; color: #2d6a4f; }
+    .badge-unknown { background: #f7fafc; color: #718096; }
+
+    .latency { color: #718096; font-size: .82rem; }
+
+    /* ── Progress Bar ── */
+    #progress-wrap {
+      display: none;
+      margin-top: 1.25rem;
+    }
+
+    #progress-label {
+      font-size: .85rem;
+      color: #4a5568;
+      margin-bottom: .4rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #progress-track {
+      background: #e2e8f0;
+      border-radius: 9999px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    #progress-fill {
+      height: 100%;
+      background: #3182ce;
+      border-radius: 9999px;
+      width: 0%;
+      transition: width .3s ease;
+    }
+
+    /* ── Row states ── */
+    tr.pending td { color: #a0aec0; font-style: italic; }
+    tr.processing td { background: #ebf8ff; }
+    tr.done td { }
+    tr.failed td { background: #fff5f5; color: #c53030; }
+
+    /* ── Error Banner ── */
+    #error-banner {
+      display: none;
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      color: #c53030;
+      font-size: .9rem;
+      margin-top: 1rem;
+    }
+
+    /* ── Summary Bar ── */
+    #summary-bar {
+      display: flex;
+      gap: 1.5rem;
+      font-size: .85rem;
+      color: #4a5568;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    #summary-bar strong { color: #2d3748; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MediShield Document Classifier</h1>
+  <p>Upload scanned insurance documents to classify them automatically.</p>
+</header>
+
+<!-- Upload Card -->
+<div class="card">
+  <div id="drop-zone" role="button" tabindex="0" aria-label="Drop images here or click to browse">
+    <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+    </svg>
+    <p>Drag & drop images here</p>
+    <span>or click to browse — PNG, JPEG, WebP accepted</span>
+  </div>
+
+  <input type="file" id="file-input" multiple accept="image/png,image/jpeg,image/webp" />
+
+  <div id="preview-grid"></div>
+
+  <div id="error-banner"></div>
+
+  <div class="actions">
+    <button id="classify-btn" disabled>Classify Documents</button>
+    <button id="clear-btn">Clear</button>
+    <span id="file-count" style="font-size:.85rem;color:#718096;"></span>
+  </div>
+
+  <div id="progress-wrap">
+    <div id="progress-label">
+      <span id="progress-text">Processing…</span>
+      <span id="progress-fraction"></span>
+    </div>
+    <div id="progress-track"><div id="progress-fill"></div></div>
+  </div>
+</div>
+
+<!-- Results Card -->
+<div class="card" id="results-section">
+  <h2>Classification Results</h2>
+  <div id="summary-bar"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Filename</th>
+        <th>Type</th>
+        <th>Sub-type</th>
+        <th>Method</th>
+        <th>Latency</th>
+      </tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+  </table>
+</div>
+
+<script>
+  const API_BASE = "http://localhost:8000";
+
+  const dropZone       = document.getElementById("drop-zone");
+  const fileInput      = document.getElementById("file-input");
+  const previewGrid    = document.getElementById("preview-grid");
+  const classifyBtn    = document.getElementById("classify-btn");
+  const clearBtn       = document.getElementById("clear-btn");
+  const fileCount      = document.getElementById("file-count");
+  const resultsSection = document.getElementById("results-section");
+  const resultsBody    = document.getElementById("results-body");
+  const errorBanner    = document.getElementById("error-banner");
+  const summaryBar     = document.getElementById("summary-bar");
+  const progressWrap   = document.getElementById("progress-wrap");
+  const progressFill   = document.getElementById("progress-fill");
+  const progressText   = document.getElementById("progress-text");
+  const progressFrac   = document.getElementById("progress-fraction");
+
+  let selectedFiles = [];   // File[]
+  const counts = { bill: 0, kyc: 0, image: 0 };
+  let totalMs = 0;
+  let rowMap = {};          // filename → <tr>
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    addFiles([...e.dataTransfer.files]);
+  });
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+
+  fileInput.addEventListener("change", () => {
+    addFiles([...fileInput.files]);
+    fileInput.value = "";
+  });
+
+  // ── File Management ───────────────────────────────────────────────────────
+
+  const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
+
+  function addFiles(files) {
+    const valid    = files.filter(f => ALLOWED.includes(f.type));
+    const rejected = files.filter(f => !ALLOWED.includes(f.type));
+
+    if (rejected.length) {
+      showError(`Skipped ${rejected.length} unsupported file(s): ${rejected.map(f => f.name).join(", ")}`);
+    } else {
+      hideError();
+    }
+
+    const existing = new Set(selectedFiles.map(f => f.name));
+    valid.filter(f => !existing.has(f.name)).forEach(f => selectedFiles.push(f));
+
+    renderPreviews();
+    updateUI();
+  }
+
+  function removeFile(name) {
+    selectedFiles = selectedFiles.filter(f => f.name !== name);
+    renderPreviews();
+    updateUI();
+  }
+
+  function renderPreviews() {
+    previewGrid.innerHTML = "";
+    selectedFiles.forEach(file => {
+      const url  = URL.createObjectURL(file);
+      const item = document.createElement("div");
+      item.className = "preview-item";
+      item.innerHTML = `
+        <img src="${url}" alt="${file.name}" onload="URL.revokeObjectURL(this.src)" />
+        <div class="preview-name" title="${file.name}">${file.name}</div>
+        <button class="remove-btn" aria-label="Remove ${file.name}">✕</button>
+      `;
+      item.querySelector(".remove-btn").addEventListener("click", () => removeFile(file.name));
+      previewGrid.appendChild(item);
+    });
+  }
+
+  function updateUI() {
+    const n = selectedFiles.length;
+    classifyBtn.disabled = n === 0;
+    fileCount.textContent = n ? `${n} file${n > 1 ? "s" : ""} selected` : "";
+  }
+
+  // ── Classify — sequential, one file at a time ─────────────────────────────
+
+  classifyBtn.addEventListener("click", async () => {
+    if (!selectedFiles.length) return;
+
+    hideError();
+    classifyBtn.disabled = true;
+    classifyBtn.innerHTML = `<span class="spinner"></span> Classifying…`;
+    clearBtn.disabled = true;
+    setPreviewInteractive(false);
+
+    // Reset counters
+    Object.keys(counts).forEach(k => counts[k] = 0);
+    totalMs = 0;
+    rowMap  = {};
+
+    // Show results table immediately with pending rows
+    resultsBody.innerHTML = "";
+    summaryBar.innerHTML  = "";
+    resultsSection.style.display = "block";
+    resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    selectedFiles.forEach(f => {
+      const tr = document.createElement("tr");
+      tr.className = "pending";
+      tr.id = `row-${CSS.escape(f.name)}`;
+      tr.innerHTML = `
+        <td class="filename-cell" title="${f.name}">${f.name}</td>
+        <td colspan="4" style="color:#a0aec0;font-size:.85rem;">queued…</td>
+      `;
+      resultsBody.appendChild(tr);
+      rowMap[f.name] = tr;
+    });
+
+    // Show progress bar
+    const total = selectedFiles.length;
+    let done = 0;
+    setProgress(0, total);
+    progressText.textContent = `Sending ${total} file${total > 1 ? "s" : ""} for classification…`;
+
+    // Mark all rows as "processing" immediately so user sees activity
+    selectedFiles.forEach(f => {
+      const tr = rowMap[f.name];
+      tr.className = "processing";
+      tr.innerHTML = `
+        <td class="filename-cell" title="${f.name}">${f.name}</td>
+        <td colspan="4">
+          <span class="spinner" style="border-color:rgba(49,130,206,.3);border-top-color:#3182ce;"></span>
+          <span style="font-size:.85rem;color:#3182ce;">classifying…</span>
+        </td>
+      `;
+    });
+
+    // Send all files in ONE batch — server runs them concurrently
+    // bill_ files finish in <5ms and don't wait behind OCR/LLM calls
+    const form = new FormData();
+    selectedFiles.forEach(f => form.append("files", f));
+
+    try {
+      const resp = await fetch(`${API_BASE}/classify`, { method: "POST", body: form });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+
+      const results = await resp.json();
+
+      results.forEach(r => {
+        const tr = rowMap[r.filename];
+        if (tr) {
+          fillRow(tr, r);
+          counts[r.doc_type] = (counts[r.doc_type] || 0) + 1;
+          totalMs += r.latency_ms || 0;
+        }
+        done++;
+        setProgress(done, total);
+        updateSummary(done, total);
+      });
+
+    } catch (err) {
+      selectedFiles.forEach(f => {
+        const tr = rowMap[f.name];
+        if (tr) {
+          tr.className = "failed";
+          tr.innerHTML = `
+            <td class="filename-cell" title="${f.name}">${f.name}</td>
+            <td colspan="4" style="color:#c53030;font-size:.85rem;">Error: ${err.message}</td>
+          `;
+        }
+      });
+      showError(`Classification failed: ${err.message}`);
+    }
+
+    // Done
+    classifyBtn.disabled = false;
+    classifyBtn.innerHTML = "Classify Documents";
+    clearBtn.disabled = false;
+    setPreviewInteractive(true);
+    progressText.textContent = `Done — ${total} file${total > 1 ? "s" : ""} classified`;
+  });
+
+  // ── Row fill ─────────────────────────────────────────────────────────────
+
+  function fillRow(tr, r) {
+    tr.className = "done";
+    tr.innerHTML = `
+      <td class="filename-cell" title="${r.filename}">${r.filename}</td>
+      <td><span class="badge badge-${r.doc_type}">${r.doc_type}</span></td>
+      <td>${r.sub_type ? `<span class="badge badge-unknown">${r.sub_type}</span>` : "—"}</td>
+      <td><span class="badge badge-${r.method}">${r.method}</span></td>
+      <td class="latency">${r.latency_ms} ms</td>
+    `;
+  }
+
+  // ── Progress ──────────────────────────────────────────────────────────────
+
+  function setProgress(done, total) {
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    progressWrap.style.display  = "block";
+    progressFill.style.width    = `${pct}%`;
+    progressFrac.textContent    = `${done} / ${total}`;
+    if (done < total) {
+      progressText.textContent  = `Processing file ${done + 1} of ${total}…`;
+    }
+  }
+
+  function updateSummary(done, total) {
+    const avg = done ? Math.round(totalMs / done) : 0;
+    summaryBar.innerHTML = `
+      <span>Classified: <strong>${done} / ${total}</strong></span>
+      ${counts.bill  ? `<span>Bills: <strong>${counts.bill}</strong></span>`         : ""}
+      ${counts.kyc   ? `<span>KYC: <strong>${counts.kyc}</strong></span>`            : ""}
+      ${counts.image ? `<span>Images (LLM): <strong>${counts.image}</strong></span>` : ""}
+      <span>Avg latency: <strong>${avg} ms</strong></span>
+    `;
+  }
+
+  // ── Clear ─────────────────────────────────────────────────────────────────
+
+  clearBtn.addEventListener("click", () => {
+    selectedFiles = [];
+    previewGrid.innerHTML            = "";
+    resultsSection.style.display     = "none";
+    resultsBody.innerHTML            = "";
+    summaryBar.innerHTML             = "";
+    progressWrap.style.display       = "none";
+    progressFill.style.width         = "0%";
+    hideError();
+    updateUI();
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function setPreviewInteractive(enabled) {
+    dropZone.style.pointerEvents = enabled ? "" : "none";
+    dropZone.style.opacity       = enabled ? "" : "0.5";
+    document.querySelectorAll(".remove-btn").forEach(btn => {
+      btn.disabled = !enabled;
+      btn.style.opacity = enabled ? "" : "0.3";
+      btn.style.cursor  = enabled ? "" : "not-allowed";
+    });
+  }
+
+  function showError(msg) {
+    errorBanner.textContent    = msg;
+    errorBanner.style.display  = "block";
+  }
+
+  function hideError() {
+    errorBanner.style.display  = "none";
+    errorBanner.textContent    = "";
+  }
+</script>
+
+</body>
+</html>
