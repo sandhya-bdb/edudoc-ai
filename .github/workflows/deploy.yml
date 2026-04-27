@@ -7,7 +7,7 @@ on:
 
 env:
   RESOURCE_GROUP: medishield-rg
-  ACR_NAME: medishieldacr
+  ACR_NAME: medishieldacr27529
   CONTAINER_APP_NAME: medishield-classifier
   IMAGE_TAG: ${{ github.sha }}
 
