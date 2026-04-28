@@ -39,7 +39,7 @@ def test_bill_file_classified_by_rules():
     result = classify("bill_innovh_01.png", FAKE_BYTES)
     assert result.doc_type == "bill"
     assert result.method == "rules"
-    assert result.sub_type is None
+    assert result.sub_type == "Bills"
 
 
 def test_bill_file_never_calls_ocr():
@@ -68,7 +68,7 @@ def test_kyc_doc_classified_by_ocr():
     result = classify("03ac1d4117.png", FAKE_BYTES, ocr_reader=_kyc_reader(True))
     assert result.doc_type == "kyc"
     assert result.method == "ocr"
-    assert result.sub_type is None
+    assert result.sub_type == "KYC"
 
 
 def test_kyc_doc_never_calls_llm():

@@ -61,7 +61,7 @@ IMAGE_NAME="$ACR_LOGIN_SERVER/classifier:$IMAGE_TAG"
 
 echo "▶ Building and pushing image: $IMAGE_NAME"
 az acr login --name "$ACR_NAME"
-docker build -t "$IMAGE_NAME" .
+docker build --platform linux/amd64 -t "$IMAGE_NAME" .
 docker push "$IMAGE_NAME"
 
 # ── 4. Log Analytics Workspace (for container logs) ──────────────────────────
@@ -118,8 +118,8 @@ az containerapp create \
   --registry-server "$ACR_LOGIN_SERVER" \
   --registry-username "$ACR_NAME" \
   --registry-password "$ACR_PASSWORD" \
-  --cpu 0.5 \
-  --memory 2.0Gi \
+  --cpu 2.0 \
+  --memory 4.0Gi \
   --min-replicas 1 \
   --max-replicas 3 \
   --ingress external \

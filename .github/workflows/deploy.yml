@@ -51,14 +51,44 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # ── Build & push image to ACR ─────────────────────────────────────────
-      - name: Build and push image to ACR
+      # ── Set up buildx for linux/amd64 cross-platform builds ──────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Build linux/amd64 image (load into local Docker for smoke test) ──
+      - name: Build image (linux/amd64)
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ACR_NAME }}.azurecr.io/classifier:latest \
+            --load .
+
+      # ── Pre-push smoke test: image actually starts and /health responds ──
+      - name: Smoke test image locally
+        run: |
+          docker run -d --name smoke -p 8000:8000 \
+            -e GOOGLE_API_KEY=dummy-key-for-smoke-test \
+            -e PYTHONUNBUFFERED=1 \
+            ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }}
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health; then
+              echo "✅ Local image /health OK"
+              docker rm -f smoke
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Local image failed to become healthy"
+          docker logs smoke
+          docker rm -f smoke
+          exit 1
+
+      # ── Push to ACR (only after local smoke test passed) ─────────────────
+      - name: Push image to ACR
         run: |
           ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query "passwords[0].value" -o tsv)
           echo "$ACR_PASSWORD" | docker login ${{ env.ACR_NAME }}.azurecr.io \
             --username ${{ env.ACR_NAME }} --password-stdin
-          docker build -t ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }} \
-                       -t ${{ env.ACR_NAME }}.azurecr.io/classifier:latest .
           docker push ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/classifier:latest
 
@@ -77,22 +107,47 @@ jobs:
       # ── Rolling deploy to Container Apps ──────────────────────────────────
       - name: Deploy to Container Apps
         run: |
+          ENV_VARS="GOOGLE_API_KEY=secretref:google-api-key PYTHONUNBUFFERED=1"
+          if [ -n "${{ secrets.LANGCHAIN_API_KEY }}" ]; then
+            ENV_VARS="$ENV_VARS LANGCHAIN_TRACING_V2=true LANGCHAIN_API_KEY=secretref:langchain-api-key LANGCHAIN_PROJECT=medishield-classification"
+          fi
           az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }}
+            --image ${{ env.ACR_NAME }}.azurecr.io/classifier:${{ env.IMAGE_TAG }} \
+            --set-env-vars $ENV_VARS
 
       # ── Smoke test the live endpoint ──────────────────────────────────────
-      - name: Smoke test health endpoint
+      - name: Smoke test live /health
         run: |
           APP_URL=$(az containerapp show \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query "properties.configuration.ingress.fqdn" -o tsv)
-
-          echo "Testing https://$APP_URL/health"
           curl --fail --retry 5 --retry-delay 10 "https://$APP_URL/health"
-          echo "✅ Smoke test passed"
+          echo "✅ /health OK"
+
+      # ── Functional test: POST /classify with a real document ────────────
+      - name: Smoke test live /classify
+        run: |
+          APP_URL=$(az containerapp show \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          SAMPLE=$(ls dataset/*.png 2>/dev/null | head -1)
+          if [ -z "$SAMPLE" ]; then
+            echo "No sample image in dataset/, skipping functional test"
+            exit 0
+          fi
+          HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "https://$APP_URL/classify" -F "files=@$SAMPLE")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ /classify returned $HTTP_CODE"
+            cat /tmp/resp.json
+            exit 1
+          fi
+          echo "✅ /classify returned 200"
+          cat /tmp/resp.json
 
       - name: Print app URL
         run: |

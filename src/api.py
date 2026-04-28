@@ -6,7 +6,9 @@ from functools import partial
 import easyocr
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from google import genai
 import os
 from dotenv import load_dotenv
@@ -16,6 +18,11 @@ from src.classifier import classify
 load_dotenv()
 
 ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+
+# Cap how many documents are classified concurrently per request.
+# Tuned for a 4 GiB replica: each easyocr + Gemini call can spike to ~400-600 MB,
+# so >5 in flight risks OOM. Override with CLASSIFY_CONCURRENCY env var.
+MAX_CONCURRENT_CLASSIFICATIONS = int(os.environ.get("CLASSIFY_CONCURRENCY", "5"))
 
 # ── metrics store (in-memory, reset on restart) ───────────────────────────────
 _metrics: dict = {
@@ -56,6 +63,15 @@ app.add_middleware(
 )
 
 
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if FRONTEND_DIR.is_dir():
+    @app.get("/", include_in_schema=False)
+    def index():
+        return FileResponse(FRONTEND_DIR / "index.html")
+
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -86,18 +102,20 @@ async def classify_documents(files: list[UploadFile] = File(...)):
     contents = await asyncio.gather(*[f.read() for f in files])
 
     loop = asyncio.get_running_loop()
+    sem = asyncio.Semaphore(MAX_CONCURRENT_CLASSIFICATIONS)
 
     async def _classify_one(filename: str, image_bytes: bytes):
-        # Run synchronous classify() in a thread so bill_ files don't wait
-        # behind slow OCR/LLM calls from other concurrent requests
-        fn = partial(
-            classify,
-            filename=filename,
-            image_bytes=image_bytes,
-            ocr_reader=_ocr_reader,
-            llm_client=_llm_client,
-        )
-        return await loop.run_in_executor(None, fn)
+        # Semaphore caps in-flight classifications so a 50-doc upload doesn't OOM
+        # the worker. Excess docs queue here until a slot frees up.
+        async with sem:
+            fn = partial(
+                classify,
+                filename=filename,
+                image_bytes=image_bytes,
+                ocr_reader=_ocr_reader,
+                llm_client=_llm_client,
+            )
+            return await loop.run_in_executor(None, fn)
 
     classifications = await asyncio.gather(*[
         _classify_one(f.filename or "unknown.png", data)

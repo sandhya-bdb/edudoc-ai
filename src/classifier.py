@@ -11,6 +11,13 @@ from src.monitoring import trace_classify, trace_kyc_ocr, trace_llm_classify, tr
 from src.rules_engine import apply_rules
 
 
+_SUB_TYPE_DEFAULTS = {"bill": "Bills", "kyc": "KYC"}
+
+
+def _default_sub_type(doc_type: str) -> str | None:
+    return _SUB_TYPE_DEFAULTS.get(doc_type)
+
+
 @dataclass
 class ClassificationResult:
     filename: str
@@ -42,7 +49,7 @@ def classify(
         result = ClassificationResult(
             filename=filename,
             doc_type=rules_result.doc_type,
-            sub_type=None,
+            sub_type=_default_sub_type(rules_result.doc_type),
             method="rules",
             latency_ms=int((time.monotonic() - start) * 1000),
         )
@@ -61,7 +68,7 @@ def classify(
         result = ClassificationResult(
             filename=filename,
             doc_type=kyc_result.doc_type,
-            sub_type=None,
+            sub_type=_default_sub_type(kyc_result.doc_type),
             method="ocr",
             latency_ms=int((time.monotonic() - start) * 1000),
         )
