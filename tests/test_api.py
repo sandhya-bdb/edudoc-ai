@@ -1,5 +1,11 @@
 import io
+import json
 from unittest.mock import MagicMock, patch
+
+
+def _ndjson(resp):
+    """Parse an NDJSON response body into a list of records."""
+    return [json.loads(line) for line in resp.text.splitlines() if line.strip()]
 
 import pytest
 from fastapi.testclient import TestClient
@@ -75,7 +81,7 @@ def test_classify_bill_file_doc_type(client):
         filename="bill_innovh_01.png", doc_type="bill", method="rules"
     )):
         resp = client.post("/classify", files=[_upload("bill_innovh_01.png")])
-    body = resp.json()
+    body = _ndjson(resp)
     assert body[0]["doc_type"] == "bill"
     assert body[0]["method"] == "rules"
 
@@ -91,7 +97,7 @@ def test_classify_multiple_files_returns_array(client):
         files = [_upload(f"doc_{i}.png") for i in range(5)]
         resp = client.post("/classify", files=files)
     assert resp.status_code == 200
-    assert len(resp.json()) == 5
+    assert len(_ndjson(resp)) == 5
 
 
 def test_classify_response_schema_has_required_fields(client):
@@ -99,7 +105,7 @@ def test_classify_response_schema_has_required_fields(client):
         doc_type="image", sub_type="Prescriptions", method="llm"
     )):
         resp = client.post("/classify", files=[_upload("test.png")])
-    record = resp.json()[0]
+    record = _ndjson(resp)[0]
     for field in ("filename", "doc_type", "sub_type", "method", "latency_ms"):
         assert field in record, f"Missing field: {field}"
 
