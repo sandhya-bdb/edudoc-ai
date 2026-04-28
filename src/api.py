@@ -6,7 +6,8 @@ from functools import partial
 import easyocr
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+import json
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from google import genai
@@ -117,17 +118,18 @@ async def classify_documents(files: list[UploadFile] = File(...)):
             )
             return await loop.run_in_executor(None, fn)
 
-    classifications = await asyncio.gather(*[
-        _classify_one(f.filename or "unknown.png", data)
+    tasks = [
+        asyncio.create_task(_classify_one(f.filename or "unknown.png", data))
         for f, data in zip(files, contents)
-    ])
+    ]
 
-    results = []
-    for result in classifications:
-        _metrics["total_input_tokens"] += result.input_tokens
-        _metrics["total_output_tokens"] += result.output_tokens
-        _metrics["by_method"][result.method] = _metrics["by_method"].get(result.method, 0) + 1
-        _metrics["by_doc_type"][result.doc_type] = _metrics["by_doc_type"].get(result.doc_type, 0) + 1
-        results.append(asdict(result))
+    async def stream():
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            _metrics["total_input_tokens"] += result.input_tokens
+            _metrics["total_output_tokens"] += result.output_tokens
+            _metrics["by_method"][result.method] = _metrics["by_method"].get(result.method, 0) + 1
+            _metrics["by_doc_type"][result.doc_type] = _metrics["by_doc_type"].get(result.doc_type, 0) + 1
+            yield json.dumps(asdict(result)) + "\n"
 
-    return JSONResponse(content=results)
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
