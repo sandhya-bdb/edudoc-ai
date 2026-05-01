@@ -1,4 +1,4 @@
-# MediShield AI Document Classification — Implementation Plan
+# EduDoc AI AI Document Classification — Implementation Plan
 
 ## Workflow Diagram
 
@@ -9,27 +9,27 @@
                                        │
                         ┌──────────────▼──────────────────┐
                         │   Stage 1: Rules Engine          │
-                        │   regex: ^bill_                  │
+                        │   regex: ^transcript_                  │
                         └──────────────┬──────────────────┘
                                        │
                      ┌─────────────────┴──────────────────┐
-               bill_ match?                           no match
+               transcript_ match?                           no match
                      │                                     │
           ┌──────────▼──────────┐          ┌──────────────▼──────────────┐
-          │  doc_type = "bill"   │          │   Stage 2: KYC OCR           │
+          │  doc_type = "transcript"   │          │   Stage 2: EDU OCR           │
           │  method   = "rules"  │          │   easyocr → keyword regex    │
           │  ✓ DONE              │          └──────────────┬──────────────┘
           └─────────────────────┘                         │
                                           ┌──────────────┴──────────────┐
-                                    KYC match?                     no match
+                                    EDU match?                     no match
                                           │                              │
                              ┌────────────▼────────┐   ┌───────────────▼─────────────┐
-                             │  doc_type = "kyc"   │   │  Stage 3: Gemini LLM         │
+                             │  doc_type = "edu"   │   │  Stage 3: Gemini LLM         │
                              │  method   = "ocr"   │   │  gemma-4-31b-it              │
-                             │  ✓ DONE             │   │  → Patient Bills             │
+                             │  ✓ DONE             │   │  → Transcripts             │
                              └─────────────────────┘   │  → Claim Forms               │
-                                                        │  → Medical Reports           │
-                                                        │  → Prescriptions             │
+                                                        │  → Certificates           │
+                                                        │  → Student IDs             │
                                                         │  → Unknown                   │
                                                         └──────────────────────────────┘
                                                                      │
@@ -54,7 +54,7 @@ Container deployed on Azure Container Apps via GitHub Actions CI/CD
 │  - Batch upload (all files in one POST)              │
 │  - Concurrent server processing (asyncio.gather)     │
 │  - Live progress bar + per-file status rows          │
-│  - Color-coded badges: bill/kyc/image                │
+│  - Color-coded badges: transcript/edu/image                │
 └───────────────────┬─────────────────────────────────┘
                     │ POST /classify (multipart)
                     ▼
@@ -73,7 +73,7 @@ Container deployed on Azure Container Apps via GitHub Actions CI/CD
              ▼      ▼      ▼
 ┌────────────────────────────────────────────────────┐
 │  src/monitoring.py  — LangSmith @traceable spans   │
-│  trace_rules_engine · trace_kyc_ocr                │
+│  trace_rules_engine · trace_edu_ocr                │
 │  trace_llm_classify · trace_classify               │
 └────────────────────────────────────────────────────┘
                     │
@@ -87,8 +87,8 @@ Container deployed on Azure Container Apps via GitHub Actions CI/CD
 
 | Condition | doc_type | method | Sent to LLM? |
 |---|---|---|---|
-| filename matches `^bill_` (regex) | `bill` | `rules` | No |
-| OCR text contains KYC keywords | `kyc` | `ocr` | No |
+| filename matches `^transcript_` (regex) | `transcript` | `rules` | No |
+| OCR text contains EDU keywords | `edu` | `ocr` | No |
 | Everything else | `image` | `llm` | Yes |
 
 ## Final File Layout
@@ -97,7 +97,7 @@ Container deployed on Azure Container Apps via GitHub Actions CI/CD
 multimodal-ai/
 ├── src/
 │   ├── rules_engine.py       # Step 1 ✅
-│   ├── kyc_detector.py       # Step 2 ✅
+│   ├── edu_detector.py       # Step 2 ✅
 │   ├── llm_classifier.py     # Step 3 ✅
 │   ├── classifier.py         # Step 4 ✅
 │   ├── api.py                # Step 5 ✅
@@ -106,7 +106,7 @@ multimodal-ai/
 │   └── index.html            # Step 6 ✅
 ├── tests/
 │   ├── test_rules_engine.py  # 11 tests  ✅
-│   ├── test_kyc_detector.py  # 21 tests  ✅
+│   ├── test_edu_detector.py  # 21 tests  ✅
 │   ├── test_llm_classifier.py # 32 tests ✅
 │   ├── test_classifier.py    # 29 tests  ✅
 │   ├── test_api.py           # 11 tests  ✅
@@ -131,17 +131,17 @@ multimodal-ai/
 ### Phase 1 — Core Classification Engine
 
 - [x] **Step 1 — Rules Engine** (`src/rules_engine.py`)
-  - Compiled regex `re.compile(r"^bill_")` — case-sensitive, anchored to start of filename
-  - Strips directory prefix so full paths work (`dataset/bill_x.png`)
+  - Compiled regex `re.compile(r"^transcript_")` — case-sensitive, anchored to start of filename
+  - Strips directory prefix so full paths work (`dataset/transcript_x.png`)
   - Returns `RulesResult(filename, doc_type, send_to_llm)`
   - **Changed from plan:** Used `re.compile` regex instead of `str.startswith()` as requested
   - ✅ **11/11 tests passing**
 
-- [x] **Step 2 — KYC Detector** (`src/kyc_detector.py`)
+- [x] **Step 2 — KYC Detector** (`src/edu_detector.py`)
   - 11 compiled regex patterns covering Aadhaar, PAN, Passport, Govt of India, DOB, 12-digit Aadhaar number, PAN card format
   - easyocr `Reader` is a lazy singleton — loaded once on first use, not at import time
   - `reader` is injectable (passed as parameter) so tests never load the real model
-  - Returns `KYCResult(filename, doc_type, send_to_llm, ocr_text)`
+  - Returns `EduResult(filename, doc_type, send_to_llm, ocr_text)`
   - ✅ **21/21 tests passing**
 
 - [x] **Step 3 — LLM Classifier** (`src/llm_classifier.py`)
@@ -169,7 +169,7 @@ multimodal-ai/
   - `GET /health` — liveness probe
   - `GET /metrics` — in-memory counters per method/doc_type/token usage
   - `GET /docs` — auto Swagger UI
-  - **Changed from plan:** `asyncio.gather` + `run_in_executor` runs all uploaded files concurrently — `bill_` files return in < 10 ms without waiting behind OCR/LLM calls
+  - **Changed from plan:** `asyncio.gather` + `run_in_executor` runs all uploaded files concurrently — `transcript_` files return in < 10 ms without waiting behind OCR/LLM calls
   - easyocr `Reader` and Gemini `Client` loaded once at startup via FastAPI `lifespan`
   - CORS middleware enabled for browser UI
   - ✅ **11/11 tests passing** (patched at `src.api.classify`)
@@ -181,10 +181,10 @@ multimodal-ai/
 - [x] **Step 6 — Drag & Drop UI** (`frontend/index.html`)
   - Self-contained single HTML file, no external dependencies
   - Drag & drop + click-to-browse, deduplicates files by name
-  - **Changed from plan (sequential → batch):** Sends all files in ONE `POST /classify` — server processes concurrently so `bill_` files don't wait behind slow OCR/LLM calls
+  - **Changed from plan (sequential → batch):** Sends all files in ONE `POST /classify` — server processes concurrently so `transcript_` files don't wait behind slow OCR/LLM calls
   - Results table appears immediately with `queued…` rows; fills in as server responds
   - Live progress bar + `Processing file N of M` text
-  - Color-coded badges: bill=blue, kyc=orange, image=green, rules=purple, ocr=red, llm=teal
+  - Color-coded badges: transcript=blue, edu=orange, image=green, rules=purple, ocr=red, llm=teal
   - All controls (classify, clear, remove buttons, drop zone) disabled during processing
   - Summary bar: counts per type + average latency
   - Error banner for API failures and unsupported file types
@@ -197,7 +197,7 @@ multimodal-ai/
   - Four `@traceable` functions forming a parent/child span tree:
     - `trace_classify` — top-level `chain` span per document
     - `trace_rules_engine` — `tool` span for Stage 1
-    - `trace_kyc_ocr` — `tool` span for Stage 2; records `ocr_text_length` not raw text (PII safety)
+    - `trace_edu_ocr` — `tool` span for Stage 2; records `ocr_text_length` not raw text (PII safety)
     - `trace_llm_classify` — `llm` span for Stage 3; records token breakdown
   - `record_token_usage()` extracts `input/output/total_tokens` from Gemini `usage_metadata`
   - Tracing is a **no-op** when `LANGCHAIN_TRACING_V2` is not set — CI safe
@@ -205,7 +205,7 @@ multimodal-ai/
     ```
     LANGCHAIN_TRACING_V2=true
     LANGCHAIN_API_KEY=<key>
-    LANGCHAIN_PROJECT=medishield-classification
+    LANGCHAIN_PROJECT=edudoc-ai-classification
     ```
   - ✅ **13/13 tests passing**
 
@@ -255,7 +255,7 @@ multimodal-ai/
 | # | Deliverable | Test Gate | Status |
 |---|---|---|---|
 | 1 | Rules Engine | `pytest tests/test_rules_engine.py` — 11 passed | ✅ |
-| 2 | KYC Detector | `pytest tests/test_kyc_detector.py` — 21 passed | ✅ |
+| 2 | KYC Detector | `pytest tests/test_edu_detector.py` — 21 passed | ✅ |
 | 3 | LLM Classifier | `pytest tests/test_llm_classifier.py` — 32 passed | ✅ |
 | 4 | Orchestrator | `pytest tests/test_classifier.py` — 29 passed | ✅ |
 | 5 | FastAPI Server | `pytest tests/test_api.py` — 11 passed + Swagger check | ✅ |
@@ -271,7 +271,7 @@ multimodal-ai/
 
 | Area | Original Plan | What We Actually Built |
 |---|---|---|
-| Rules matching | `str.startswith("bill_")` | `re.compile(r"^bill_")` regex |
+| Rules matching | `str.startswith("transcript_")` | `re.compile(r"^transcript_")` regex |
 | API concurrency | Sequential file loop | `asyncio.gather` + `run_in_executor` |
 | UI upload strategy | One request per file (sequential) | One batch request, server concurrent |
 | Cloud provider | AWS ECS Fargate | Azure Container Apps |

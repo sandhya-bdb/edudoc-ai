@@ -1,7 +1,8 @@
 import re
 from dataclasses import dataclass
 
-_BILL_PATTERN = re.compile(r"^bill_")
+_TRANSCRIPT_PATTERN = re.compile(r"^transcript_")
+_CERT_PATTERN = re.compile(r"^cert_")
 
 
 @dataclass
@@ -15,7 +16,10 @@ def apply_rules(filename: str) -> RulesResult:
     """Apply filename-based rules before any ML processing."""
     name = filename.split("/")[-1].split("\\")[-1]
 
-    if _BILL_PATTERN.match(name):
-        return RulesResult(filename=filename, doc_type="bill", send_to_llm=False)
+    if _TRANSCRIPT_PATTERN.match(name):
+        return RulesResult(filename=filename, doc_type="transcript", send_to_llm=False)
+    
+    if _CERT_PATTERN.match(name):
+        return RulesResult(filename=filename, doc_type="certificate", send_to_llm=False)
 
     return RulesResult(filename=filename, doc_type=None, send_to_llm=True)

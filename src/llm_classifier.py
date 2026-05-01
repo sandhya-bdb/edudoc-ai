@@ -10,16 +10,16 @@ load_dotenv()
 MODEL = "gemma-4-31b-it"
 
 CATEGORIES = [
-    "Patient Bills",
-    "Claim Forms",
-    "KYC Documents",
-    "Medical Reports",
-    "Prescriptions",
+    "Transcripts",
+    "Certificates",
+    "Student IDs",
+    "Admission Letters",
+    "Assignment Papers",
     "Unknown",
 ]
 
 PROMPT = (
-    "You are a document classification assistant for MediShield Insurance.\n"
+    "You are an educational document classification assistant for EduDoc AI.\n"
     "Examine the scanned document image and classify it into exactly one of these categories:\n\n"
     + "\n".join(f"- {c}" for c in CATEGORIES)
     + "\n\nRespond with only the category name, nothing else."

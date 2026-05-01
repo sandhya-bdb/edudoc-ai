@@ -9,8 +9,9 @@ WORKDIR /app
 # Copy dependency files first for layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install production deps only into /app/.venv
-RUN uv sync --frozen --no-dev --no-install-project
+# Install production deps. We remove --frozen to allow uv to re-resolve 
+# for linux/amd64 and use the CPU-only torch sources defined in pyproject.toml.
+RUN uv sync --no-dev --no-install-project
 
 # ── Stage 2: runtime image ────────────────────────────────────────────────────
 FROM python:3.12-slim AS runtime
@@ -29,18 +30,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy venv from builder
-COPY --from=builder /app/.venv /app/.venv
+# Create user first so we can use it in COPY --chown
+RUN useradd --create-home --shell /bin/false appuser
 
-# Copy application source
-COPY src/ ./src/
-COPY frontend/ ./frontend/
+# Copy venv and source with ownership already set (much faster/more reliable than chown -R)
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser frontend/ ./frontend/
 
-# Non-root user for security — create home so easyocr can write model cache
-RUN useradd --create-home --shell /bin/false appuser \
-    && chown -R appuser:appuser /app
-
-# Pre-download easyocr models at build time as appuser so cache dir is owned correctly
+# Pre-download easyocr models as appuser
 USER appuser
 ENV EASYOCR_MODULE_PATH="/home/appuser/.EasyOCR"
 RUN /app/.venv/bin/python -c "import easyocr; easyocr.Reader(['en'], gpu=False)" \

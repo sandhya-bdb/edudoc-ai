@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# MediShield Document Classifier — Azure Container Apps deployment
+# EduDoc AI Document Classifier — Azure Container Apps deployment
 #
 # Prerequisites:
 #   - Azure CLI installed and logged in  (az login)
@@ -16,13 +16,15 @@
 set -euo pipefail
 
 # ── Config (override via env vars before running) ────────────────────────────
-RESOURCE_GROUP="${RESOURCE_GROUP:-medishield-rg}"
+RESOURCE_GROUP="${RESOURCE_GROUP:-edudoc-ai-rg}"
 LOCATION="${LOCATION:-eastus}"
-ACR_NAME="${ACR_NAME:-medishieldacr$RANDOM}"   # must be globally unique
-CONTAINER_APP_ENV="${CONTAINER_APP_ENV:-medishield-env}"
-CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-medishield-classifier}"
+ACR_NAME="${ACR_NAME:-edudocaiacr18970}"   # pinned — reuse existing registry
+EXISTING_ENV_RG="edudoc-rg"               # resource group of pre-existing environment
+EXISTING_ENV_NAME="edudoc-env"            # reuse free-tier environment (1 per region limit)
+CONTAINER_APP_ENV="${CONTAINER_APP_ENV:-edudoc-env}"
+CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-edudoc-ai-classifier}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
-LOG_WORKSPACE="${LOG_WORKSPACE:-medishield-logs}"
+LOG_WORKSPACE="${LOG_WORKSPACE:-edudoc-ai-logs}"
 
 # Load secrets from .env if present
 if [ -f .env ]; then
@@ -31,7 +33,7 @@ fi
 
 GOOGLE_API_KEY="${GOOGLE_API_KEY:?GOOGLE_API_KEY must be set in .env or environment}"
 LANGCHAIN_API_KEY="${LANGCHAIN_API_KEY:-}"
-LANGCHAIN_PROJECT="${LANGCHAIN_PROJECT:-medishield-classification}"
+LANGCHAIN_PROJECT="${LANGCHAIN_PROJECT:-edudoc-ai-classification}"
 
 # ── 1. Resource Group ─────────────────────────────────────────────────────────
 echo "▶ Creating resource group: $RESOURCE_GROUP ($LOCATION)"
@@ -64,43 +66,22 @@ az acr login --name "$ACR_NAME"
 docker build --platform linux/amd64 -t "$IMAGE_NAME" .
 docker push "$IMAGE_NAME"
 
-# ── 4. Log Analytics Workspace (for container logs) ──────────────────────────
-echo "▶ Creating Log Analytics workspace: $LOG_WORKSPACE"
-az monitor log-analytics workspace create \
-  --resource-group "$RESOURCE_GROUP" \
-  --workspace-name "$LOG_WORKSPACE" \
-  --location "$LOCATION" \
-  --output none
+# ── 4 & 5. Container Apps Environment (reuse existing — free tier: 1 per region) ──
+# Azure free subscriptions allow only 1 Container App Environment per region.
+# We reuse the pre-existing 'edudoc-env' environment instead of creating a new one.
+echo "▶ Reusing existing Container Apps environment: $EXISTING_ENV_NAME (in $EXISTING_ENV_RG)"
+CONTAINER_APP_ENV_RESOURCE_GROUP="$EXISTING_ENV_RG"
+CONTAINER_APP_ENV="$EXISTING_ENV_NAME"
 
-LOG_WORKSPACE_ID=$(az monitor log-analytics workspace show \
-  --resource-group "$RESOURCE_GROUP" \
-  --workspace-name "$LOG_WORKSPACE" \
-  --query customerId -o tsv)
-
-LOG_WORKSPACE_KEY=$(az monitor log-analytics workspace get-shared-keys \
-  --resource-group "$RESOURCE_GROUP" \
-  --workspace-name "$LOG_WORKSPACE" \
-  --query primarySharedKey -o tsv)
-
-# ── 5. Container Apps Environment ────────────────────────────────────────────
-echo "▶ Creating Container Apps environment: $CONTAINER_APP_ENV"
-az containerapp env create \
-  --name "$CONTAINER_APP_ENV" \
-  --resource-group "$RESOURCE_GROUP" \
-  --location "$LOCATION" \
-  --logs-workspace-id "$LOG_WORKSPACE_ID" \
-  --logs-workspace-key "$LOG_WORKSPACE_KEY" \
-  --output none
-
-# ── 6. Build env-vars and secrets lists ──────────────────────────────────────
-SECRETS="google-api-key=$GOOGLE_API_KEY"
-ENV_VARS="GOOGLE_API_KEY=secretref:google-api-key PYTHONUNBUFFERED=1"
+# ── 6. Build env-vars and secrets lists (use arrays for safe quoting) ───────
+SECRETS_ARGS=("google-api-key=$GOOGLE_API_KEY")
+ENV_VARS_ARGS=("GOOGLE_API_KEY=secretref:google-api-key" "PYTHONUNBUFFERED=1")
 
 if [ -n "$LANGCHAIN_API_KEY" ]; then
-  SECRETS="$SECRETS,langchain-api-key=$LANGCHAIN_API_KEY"
-  ENV_VARS="$ENV_VARS LANGCHAIN_TRACING_V2=true"
-  ENV_VARS="$ENV_VARS LANGCHAIN_API_KEY=secretref:langchain-api-key"
-  ENV_VARS="$ENV_VARS LANGCHAIN_PROJECT=$LANGCHAIN_PROJECT"
+  SECRETS_ARGS+=("langchain-api-key=$LANGCHAIN_API_KEY")
+  ENV_VARS_ARGS+=("LANGCHAIN_TRACING_V2=true")
+  ENV_VARS_ARGS+=("LANGCHAIN_API_KEY=secretref:langchain-api-key")
+  ENV_VARS_ARGS+=("LANGCHAIN_PROJECT=$LANGCHAIN_PROJECT")
 fi
 
 # ── 7. Container App ──────────────────────────────────────────────────────────
@@ -113,7 +94,7 @@ ACR_PASSWORD=$(az acr credential show \
 az containerapp create \
   --name "$CONTAINER_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --environment "$CONTAINER_APP_ENV" \
+  --environment "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$CONTAINER_APP_ENV_RESOURCE_GROUP/providers/Microsoft.App/managedEnvironments/$CONTAINER_APP_ENV" \
   --image "$IMAGE_NAME" \
   --registry-server "$ACR_LOGIN_SERVER" \
   --registry-username "$ACR_NAME" \
@@ -124,8 +105,8 @@ az containerapp create \
   --max-replicas 3 \
   --ingress external \
   --target-port 8000 \
-  --secrets "$SECRETS" \
-  --env-vars $ENV_VARS \
+  --secrets "${SECRETS_ARGS[@]}" \
+  --env-vars "${ENV_VARS_ARGS[@]}" \
   --output none
 
 # ── 8. Get public URL ─────────────────────────────────────────────────────────

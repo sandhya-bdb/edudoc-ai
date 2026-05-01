@@ -1,7 +1,7 @@
 [project]
-name = "multimodal-ai"
+name = "edudoc-ai"
 version = "0.1.0"
-description = "Add your description here"
+description = "EduDoc AI: Automatically classify educational records"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -24,3 +24,13 @@ dev = [
     "httpx>=0.27",
     "pytest>=9.0.3",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+torchvision = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+

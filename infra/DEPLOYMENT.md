@@ -1,6 +1,6 @@
 # Azure Deployment — Steering Doc
 
-End-to-end playbook for deploying the MediShield Document Classifier to Azure Container Apps. Covers the **one-time bootstrap** (run locally) and the **ongoing CI/CD path** (GitHub Actions on every push to `main`).
+End-to-end playbook for deploying the EduSmart AI Document Classifier to Azure Container Apps. Covers the **one-time bootstrap** (run locally) and the **ongoing CI/CD path** (GitHub Actions on every push to `main`).
 
 ---
 
@@ -19,22 +19,22 @@ A `.env` file at the repo root with at minimum:
 ```
 GOOGLE_API_KEY=...                  # required — Gemini API key
 LANGCHAIN_API_KEY=...               # optional — enables LangSmith tracing
-LANGCHAIN_PROJECT=medishield-classification   # optional
+LANGCHAIN_PROJECT=edudoc-ai-classification   # optional
 ```
 
 ---
 
-## 2. Azure resources created (all in `medishield-rg`, region `eastus`)
+## 2. Azure resources created (all in `edudoc-ai-rg`, region `eastus`)
 
 | # | Resource | Name | Why it exists |
 |---|---|---|---|
-| 1 | Resource Group | `medishield-rg` | A single container for every resource so teardown is one command |
-| 2 | Azure Container Registry (ACR) | `medishieldacr27529` | Private Docker registry for the app image; Container Apps pulls from here |
-| 3 | Log Analytics Workspace | `medishield-logs` | Captures container stdout/stderr — without it the app runs blind |
-| 4 | Container Apps Environment | `medishield-env` | Networking + logging boundary that hosts the Container App |
-| 5 | Container App | `medishield-classifier` | The running FastAPI service: `cpu=2.0`, `memory=4.0Gi`, `1–3 replicas`, public ingress on port 8000 |
+| 1 | Resource Group | `edudoc-ai-rg` | A single container for every resource so teardown is one command |
+| 2 | Azure Container Registry (ACR) | `edudoc-aiacr27529` | Private Docker registry for the app image; Container Apps pulls from here |
+| 3 | Log Analytics Workspace | `edudoc-ai-logs` | Captures container stdout/stderr — without it the app runs blind |
+| 4 | Container Apps Environment | `edudoc-ai-env` | Networking + logging boundary that hosts the Container App |
+| 5 | Container App | `edudoc-ai-classifier` | The running FastAPI service: `cpu=2.0`, `memory=4.0Gi`, `1–3 replicas`, public ingress on port 8000 |
 
-> ⚠️ The bootstrap script defaults `ACR_NAME=medishieldacr$RANDOM`. Always pin `ACR_NAME=medishieldacr27529` when re-running so you don't create a duplicate registry.
+> ⚠️ The bootstrap script defaults `ACR_NAME=edudoc-aiacr$RANDOM`. Always pin `ACR_NAME=edudoc-aiacr27529` when re-running so you don't create a duplicate registry.
 
 ---
 
@@ -65,7 +65,7 @@ LANGCHAIN_PROJECT=medishield-classification   # optional
 | Env var | `GOOGLE_API_KEY` | `secretref:google-api-key` | The app reads this at startup; the `secretref:` indirection keeps the value out of the env-var blob |
 | Env var | `LANGCHAIN_API_KEY` | `secretref:langchain-api-key` (optional) | Same indirection for LangSmith |
 | Env var | `LANGCHAIN_TRACING_V2` | `true` (only if LangSmith key present) | Switches the LangChain SDK into tracing mode |
-| Env var | `LANGCHAIN_PROJECT` | `medishield-classification` | LangSmith project bucket |
+| Env var | `LANGCHAIN_PROJECT` | `edudoc-ai-classification` | LangSmith project bucket |
 | Env var | `PYTHONUNBUFFERED` | `1` | Forces Python to flush stdout/stderr immediately so logs show up in Log Analytics in real time |
 
 ---
@@ -92,7 +92,7 @@ Workflow: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). Trigg
 |---|---|
 | `AZURE_CLIENT_ID` | App registration client ID with federated credential for this repo |
 | `AZURE_TENANT_ID` | Azure AD tenant |
-| `AZURE_SUBSCRIPTION_ID` | Subscription containing `medishield-rg` |
+| `AZURE_SUBSCRIPTION_ID` | Subscription containing `edudoc-ai-rg` |
 | `GOOGLE_API_KEY` | Synced to Container App secret on every deploy |
 | `LANGCHAIN_API_KEY` | Optional, for LangSmith tracing |
 
@@ -100,7 +100,7 @@ Workflow: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). Trigg
 
 1. App registration in Azure AD.
 2. Federated credential scoped to `repo:<org>/<repo>:ref:refs/heads/main` and `repo:<org>/<repo>:environment:production` (the deploy job uses `environment: production`).
-3. Role assignments on `medishield-rg`: `Contributor` (or narrower: `AcrPush` on ACR + `Container Apps Contributor` on the app).
+3. Role assignments on `edudoc-ai-rg`: `Contributor` (or narrower: `AcrPush` on ACR + `Container Apps Contributor` on the app).
 4. GitHub `production` environment created in repo settings.
 
 ---
@@ -126,7 +126,7 @@ az login                                            # opens browser; required be
 az account set --subscription "<subscription-id>"   # all resources land here
 
 # 3. Run the full bootstrap (always pin ACR_NAME on re-runs)
-ACR_NAME=medishieldacr27529 bash infra/deploy.sh    # creates RG → ACR → image → Logs → env → app
+ACR_NAME=edudoc-aiacr27529 bash infra/deploy.sh    # creates RG → ACR → image → Logs → env → app
 ```
 
 ### Day-to-day deploys
@@ -143,28 +143,28 @@ gh workflow run "Deploy to Azure Container Apps"    # same workflow, on demand
 
 ```bash
 # Tail live logs (Ctrl-C to stop)
-az containerapp logs show -n medishield-classifier -g medishield-rg --follow
+az containerapp logs show -n edudoc-ai-classifier -g edudoc-ai-rg --follow
 
 # Get the public URL
-az containerapp show -n medishield-classifier -g medishield-rg \
+az containerapp show -n edudoc-ai-classifier -g edudoc-ai-rg \
   --query properties.configuration.ingress.fqdn -o tsv
 
 # List revisions (each deploy creates a new one)
-az containerapp revision list -n medishield-classifier -g medishield-rg -o table
+az containerapp revision list -n edudoc-ai-classifier -g edudoc-ai-rg -o table
 
 # Restart the active revision (clears stuck state without redeploying)
-az containerapp revision restart -n medishield-classifier -g medishield-rg \
-  --revision $(az containerapp show -n medishield-classifier -g medishield-rg \
+az containerapp revision restart -n edudoc-ai-classifier -g edudoc-ai-rg \
+  --revision $(az containerapp show -n edudoc-ai-classifier -g edudoc-ai-rg \
                --query properties.latestRevisionName -o tsv)
 
 # Roll back to a previous revision
-az containerapp ingress traffic set -n medishield-classifier -g medishield-rg \
+az containerapp ingress traffic set -n edudoc-ai-classifier -g edudoc-ai-rg \
   --revision-weight <old-revision-name>=100
 
 # Update only the secret (e.g. rotated GOOGLE_API_KEY) without redeploying image
-az containerapp secret set -n medishield-classifier -g medishield-rg \
+az containerapp secret set -n edudoc-ai-classifier -g edudoc-ai-rg \
   --secrets google-api-key=<new-value>
-az containerapp revision restart -n medishield-classifier -g medishield-rg \
+az containerapp revision restart -n edudoc-ai-classifier -g edudoc-ai-rg \
   --revision <active-revision>                      # restart so the new secret is read
 
 # Tear down EVERYTHING (deletes the resource group)
@@ -174,11 +174,11 @@ bash infra/teardown.sh
 ### Manual image rebuild (if CI is broken)
 
 ```bash
-az acr login --name medishieldacr27529              # refresh Docker creds against ACR
-docker build -t medishieldacr27529.azurecr.io/classifier:latest .
-docker push medishieldacr27529.azurecr.io/classifier:latest
-az containerapp update -n medishield-classifier -g medishield-rg \
-  --image medishieldacr27529.azurecr.io/classifier:latest
+az acr login --name edudoc-aiacr27529              # refresh Docker creds against ACR
+docker build -t edudoc-aiacr27529.azurecr.io/classifier:latest .
+docker push edudoc-aiacr27529.azurecr.io/classifier:latest
+az containerapp update -n edudoc-ai-classifier -g edudoc-ai-rg \
+  --image edudoc-aiacr27529.azurecr.io/classifier:latest
 ```
 
 ---
@@ -188,8 +188,8 @@ az containerapp update -n medishield-classifier -g medishield-rg \
 ### Q: `docker push` fails partway through with `unauthorized:`
 The ACR access token (~3 hr lifetime) expired during a slow upload of large layers (easyocr models, Python venv). Re-run:
 ```bash
-az acr login --name medishieldacr27529
-docker push medishieldacr27529.azurecr.io/classifier:latest
+az acr login --name edudoc-aiacr27529
+docker push edudoc-aiacr27529.azurecr.io/classifier:latest
 ```
 Already-uploaded layers skip instantly, so the retry is fast.
 
@@ -209,14 +209,14 @@ Federated credential subject doesn't match. The workflow's `environment: product
 ### Q: `/classify` returns 503 in Azure (works locally)
 The worker is being OOM-killed mid-request. Logs show `Child process [N] died`. EasyOCR (~600 MB resident) + Gemini SDK + parallel docs exceeds 2 GiB. Bump memory:
 ```bash
-az containerapp update -n medishield-classifier -g medishield-rg --cpu 2.0 --memory 4.0Gi
+az containerapp update -n edudoc-ai-classifier -g edudoc-ai-rg --cpu 2.0 --memory 4.0Gi
 ```
 Valid combos must follow the matrix (`0.25/0.5Gi`, `0.5/1Gi`, `1/2Gi`, `2/4Gi`, `4/8Gi`, …) — see the FAQ entry below for the full list.
 
 ### Q: Deploy succeeds but `/health` smoke test fails
-1. Tail logs: `az containerapp logs show -n medishield-classifier -g medishield-rg --follow`
+1. Tail logs: `az containerapp logs show -n edudoc-ai-classifier -g edudoc-ai-rg --follow`
 2. Common causes:
-   - `GOOGLE_API_KEY` missing or invalid → check `az containerapp secret list -n medishield-classifier -g medishield-rg`
+   - `GOOGLE_API_KEY` missing or invalid → check `az containerapp secret list -n edudoc-ai-classifier -g edudoc-ai-rg`
    - Image built for wrong arch (Apple Silicon → linux/amd64) → rebuild with `docker build --platform linux/amd64 …`
    - App needs >2 GiB RAM at boot (easyocr model load) → bump `--memory` to `4.0Gi`
 3. Roll back with `az containerapp ingress traffic set …` (see commands above).
@@ -224,11 +224,11 @@ Valid combos must follow the matrix (`0.25/0.5Gi`, `0.5/1Gi`, `1/2Gi`, `2/4Gi`, 
 ### Q: `az containerapp create` says "ContainerAppName already exists"
 Bootstrap already ran. Don't re-run `deploy.sh` for updates — push to `main` (CI handles it) or run a one-off `az containerapp update --image …`.
 
-### Q: Re-running `deploy.sh` created a second ACR (`medishieldacr12345`)
-The script's `ACR_NAME=medishieldacr$RANDOM` default fired again. Always pin: `ACR_NAME=medishieldacr27529 bash infra/deploy.sh`. Delete the duplicate: `az acr delete -n <duplicate-name> -g medishield-rg --yes`.
+### Q: Re-running `deploy.sh` created a second ACR (`edudoc-aiacr12345`)
+The script's `ACR_NAME=edudoc-aiacr$RANDOM` default fired again. Always pin: `ACR_NAME=edudoc-aiacr27529 bash infra/deploy.sh`. Delete the duplicate: `az acr delete -n <duplicate-name> -g edudoc-ai-rg --yes`.
 
 ### Q: Container App is stuck on an old revision
-1. `az containerapp revision list -n medishield-classifier -g medishield-rg -o table` — confirm the new revision is `Provisioned`.
+1. `az containerapp revision list -n edudoc-ai-classifier -g edudoc-ai-rg -o table` — confirm the new revision is `Provisioned`.
 2. If multiple are active, set traffic 100% to the latest: `az containerapp ingress traffic set … --revision-weight <new>=100`.
 3. If the new revision is `Failed`, view logs with `--revision <name>` and roll back.
 
@@ -237,14 +237,14 @@ Network blip pulling models from GitHub. Re-run the build; the layer cache will 
 
 ### Q: Logs aren't appearing in Log Analytics
 - Check `PYTHONUNBUFFERED=1` is set on the app (without it Python buffers stdout and logs trickle out slowly).
-- Log Analytics has a 1–3 min ingestion delay — wait, then query in the portal under the `medishield-logs` workspace, table `ContainerAppConsoleLogs_CL`.
+- Log Analytics has a 1–3 min ingestion delay — wait, then query in the portal under the `edudoc-ai-logs` workspace, table `ContainerAppConsoleLogs_CL`.
 
 ### Q: I rotated `GOOGLE_API_KEY` — how do I push it without a full redeploy?
 ```bash
-az containerapp secret set -n medishield-classifier -g medishield-rg \
+az containerapp secret set -n edudoc-ai-classifier -g edudoc-ai-rg \
   --secrets google-api-key=<new-value>
-az containerapp revision restart -n medishield-classifier -g medishield-rg \
-  --revision $(az containerapp show -n medishield-classifier -g medishield-rg \
+az containerapp revision restart -n edudoc-ai-classifier -g edudoc-ai-rg \
+  --revision $(az containerapp show -n edudoc-ai-classifier -g edudoc-ai-rg \
                --query properties.latestRevisionName -o tsv)
 ```
 
@@ -264,7 +264,7 @@ This section explains the mechanics behind the build-and-deploy commands so the 
 
 ### 9.0 Azure Container Registry (ACR) — what it is and why we use it
 
-**ACR is Azure's private Docker registry** — a managed equivalent of Docker Hub that lives inside your Azure subscription. In this project it's the resource named `medishieldacr27529`, with login server `medishieldacr27529.azurecr.io`.
+**ACR is Azure's private Docker registry** — a managed equivalent of Docker Hub that lives inside your Azure subscription. In this project it's the resource named `edudoc-aiacr27529`, with login server `edudoc-aiacr27529.azurecr.io`.
 
 **Why a registry exists in the flow at all**
 
@@ -289,11 +289,11 @@ Without ACR (or some equivalent registry) there is no path from your laptop to t
 **The image reference, decoded**
 
 ```
-medishieldacr27529.azurecr.io  /  classifier  :  latest
+edudoc-aiacr27529.azurecr.io  /  classifier  :  latest
 └────── registry login server ──┘   └─ repo ─┘   └tag┘
 ```
 
-- **Login server** = `<acr-name>.azurecr.io` — globally unique DNS name (this is why the script uses `medishieldacr$RANDOM` as a default; the name has to be unique across all of Azure).
+- **Login server** = `<acr-name>.azurecr.io` — globally unique DNS name (this is why the script uses `edudoc-aiacr$RANDOM` as a default; the name has to be unique across all of Azure).
 - **Repo** = `classifier` — within ACR you can have many repos; we only have one.
 - **Tag** = `latest` or `<git-sha>` — points to a specific layer manifest. CI pushes both.
 
@@ -310,28 +310,28 @@ az acr create --sku Basic --admin-enabled true
 
 **How auth flows in practice**
 
-1. **Local push (`bash infra/deploy.sh`)** — `az acr login --name medishieldacr27529` exchanges your `az login` token for a short-lived (~3 hr) Docker credential and stuffs it into your local Docker config. `docker push` then uses it. The token is what expires mid-push on slow uploads — the FAQ "unauthorized:" entry covers re-running.
+1. **Local push (`bash infra/deploy.sh`)** — `az acr login --name edudoc-aiacr27529` exchanges your `az login` token for a short-lived (~3 hr) Docker credential and stuffs it into your local Docker config. `docker push` then uses it. The token is what expires mid-push on slow uploads — the FAQ "unauthorized:" entry covers re-running.
 2. **GitHub Actions push** — `az acr credential show` fetches the admin password into the runner's env, then `docker login --password-stdin` and `docker push`. No persistent secrets are stored anywhere; everything is fetched on the fly using the OIDC-acquired Azure session.
-3. **Container Apps pull** — when the app was created, the script passed `--registry-username` and `--registry-password`; Azure stored these as a registry credential on the Container App. Every time it scales up or starts a new revision, it uses those creds to pull the image. (You'll see the warning `Adding registry password as a secret with name "medishieldacr27529azurecrio-medishieldacr27529"` — that's Azure stashing the password as an internal Container App secret.)
+3. **Container Apps pull** — when the app was created, the script passed `--registry-username` and `--registry-password`; Azure stored these as a registry credential on the Container App. Every time it scales up or starts a new revision, it uses those creds to pull the image. (You'll see the warning `Adding registry password as a secret with name "edudoc-aiacr27529azurecrio-edudoc-aiacr27529"` — that's Azure stashing the password as an internal Container App secret.)
 
 **Useful ACR commands**
 
 ```bash
 # List all images and tags in the registry
-az acr repository list --name medishieldacr27529 -o table
-az acr repository show-tags --name medishieldacr27529 --repository classifier -o table
+az acr repository list --name edudoc-aiacr27529 -o table
+az acr repository show-tags --name edudoc-aiacr27529 --repository classifier -o table
 
 # Inspect a manifest (digest, size, layers)
-az acr repository show-manifests --name medishieldacr27529 --repository classifier
+az acr repository show-manifests --name edudoc-aiacr27529 --repository classifier
 
 # Delete an old image to free space
-az acr repository delete --name medishieldacr27529 --image classifier:<old-sha> --yes
+az acr repository delete --name edudoc-aiacr27529 --image classifier:<old-sha> --yes
 
 # Get the admin credentials (printed only on demand, not stored anywhere readable by default)
-az acr credential show --name medishieldacr27529
+az acr credential show --name edudoc-aiacr27529
 
 # See registry storage usage
-az acr show-usage --name medishieldacr27529
+az acr show-usage --name edudoc-aiacr27529
 ```
 
 ACR retains every pushed tag forever unless you delete it or set up retention policies — over time the SHA-tagged images accumulate. For this project that's fine; in larger setups you'd configure a retention policy via `az acr config retention update`.
@@ -389,9 +389,9 @@ This is why:
 
 When `az containerapp create` or `az containerapp update --image` runs:
 
-1. **Pull credentials**: Container Apps stores ACR username/password as a registry credential on the app (see the warning `Adding registry password as a secret with name "medishieldacr27529azurecrio-…"`).
-2. **Pull the image**: The Container Apps platform pulls `medishieldacr27529.azurecr.io/classifier:<tag>` into a fresh worker node. ACR is in the same region as the app, so the pull is fast (gigabit intra-region).
-3. **Create a new revision**: Container Apps creates a new immutable revision (e.g. `medishield-classifier--abc1234`) pinned to that exact image digest — even if `:latest` is later overwritten, this revision keeps pointing at the same digest.
+1. **Pull credentials**: Container Apps stores ACR username/password as a registry credential on the app (see the warning `Adding registry password as a secret with name "edudoc-aiacr27529azurecrio-…"`).
+2. **Pull the image**: The Container Apps platform pulls `edudoc-aiacr27529.azurecr.io/classifier:<tag>` into a fresh worker node. ACR is in the same region as the app, so the pull is fast (gigabit intra-region).
+3. **Create a new revision**: Container Apps creates a new immutable revision (e.g. `edudoc-ai-classifier--abc1234`) pinned to that exact image digest — even if `:latest` is later overwritten, this revision keeps pointing at the same digest.
 4. **Health check**: The new revision starts and must pass startup probes (default: TCP on `--target-port 8000` succeeds). Once healthy, traffic shifts to it (rolling update).
 5. **Old revision**: Kept around (deactivated) so you can roll back instantly via `az containerapp ingress traffic set --revision-weight <old>=100`.
 

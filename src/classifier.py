@@ -5,13 +5,13 @@ from pathlib import Path
 import easyocr
 from google import genai
 
-from src.kyc_detector import detect_kyc
+from src.edu_detector import detect_edu
 from src.llm_classifier import classify_with_llm
-from src.monitoring import trace_classify, trace_kyc_ocr, trace_llm_classify, trace_rules_engine
+from src.monitoring import trace_classify, trace_edu_ocr, trace_llm_classify, trace_rules_engine
 from src.rules_engine import apply_rules
 
 
-_SUB_TYPE_DEFAULTS = {"bill": "Bills", "kyc": "KYC"}
+_SUB_TYPE_DEFAULTS = {"transcript": "Transcripts", "certificate": "Certificates", "education": "Education Docs"}
 
 
 def _default_sub_type(doc_type: str) -> str | None:
@@ -21,7 +21,7 @@ def _default_sub_type(doc_type: str) -> str | None:
 @dataclass
 class ClassificationResult:
     filename: str
-    doc_type: str           # "bill" | "kyc" | "image"
+    doc_type: str           # "transcript" | "certificate" | "education" | "image"
     sub_type: str | None    # Gemini category for "image" docs, else None
     method: str             # "rules" | "ocr" | "llm"
     latency_ms: int
@@ -56,19 +56,19 @@ def classify(
         trace_classify(**result.__dict__)
         return result
 
-    # Stage 2 — KYC OCR detector
-    kyc_result = detect_kyc(filename, image_bytes, reader=ocr_reader)
-    trace_kyc_ocr(
+    # Stage 2 — EDU OCR detector
+    edu_result = detect_edu(filename, image_bytes, reader=ocr_reader)
+    trace_edu_ocr(
         filename=filename,
-        doc_type=kyc_result.doc_type,
-        send_to_llm=kyc_result.send_to_llm,
-        ocr_text=kyc_result.ocr_text,
+        doc_type=edu_result.doc_type,
+        send_to_llm=edu_result.send_to_llm,
+        ocr_text=edu_result.ocr_text,
     )
-    if not kyc_result.send_to_llm:
+    if not edu_result.send_to_llm:
         result = ClassificationResult(
             filename=filename,
-            doc_type=kyc_result.doc_type,
-            sub_type=_default_sub_type(kyc_result.doc_type),
+            doc_type=edu_result.doc_type,
+            sub_type=_default_sub_type(edu_result.doc_type),
             method="ocr",
             latency_ms=int((time.monotonic() - start) * 1000),
         )
@@ -106,14 +106,15 @@ def classify_dataset(
     dataset_path = Path(dataset_dir)
     results = []
 
-    for image_path in sorted(dataset_path.glob("*.png")):
-        image_bytes = image_path.read_bytes()
-        result = classify(
-            filename=image_path.name,
-            image_bytes=image_bytes,
-            ocr_reader=ocr_reader,
-            llm_client=llm_client,
-        )
-        results.append(result)
+    for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+        for image_path in sorted(dataset_path.glob(ext)):
+            image_bytes = image_path.read_bytes()
+            result = classify(
+                filename=image_path.name,
+                image_bytes=image_bytes,
+                ocr_reader=ocr_reader,
+                llm_client=llm_client,
+            )
+            results.append(result)
 
     return results

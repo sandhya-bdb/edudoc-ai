@@ -2,7 +2,7 @@
 # Deletes the entire resource group — removes ALL resources created by deploy.sh
 set -euo pipefail
 
-RESOURCE_GROUP="${RESOURCE_GROUP:-medishield-rg}"
+RESOURCE_GROUP="${RESOURCE_GROUP:-edudoc-ai-rg}"
 
 echo "⚠  This will permanently delete resource group: $RESOURCE_GROUP"
 read -r -p "Type the resource group name to confirm: " CONFIRM

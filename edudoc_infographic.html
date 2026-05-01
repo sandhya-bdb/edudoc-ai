@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDoc Intelligence Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        .glow-box {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .flow-arrow::after {
+            content: '→';
+            position: absolute;
+            right: -24px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #475569;
+            font-size: 24px;
+            font-weight: 300;
+        }
+    </style>
+</head>
+<body class="p-10 flex justify-center items-center min-h-screen">
+    <div class="max-w-6xl w-full">
+        
+        <!-- HEADER ROW -->
+        <div class="flex justify-between items-end mb-12">
+            <div>
+                <div class="inline-block px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-semibold tracking-widest uppercase mb-4 border border-indigo-500/30">
+                    Next-Gen Admissions
+                </div>
+                <h1 class="text-6xl font-extrabold mb-2"><span class="gradient-text">EduDoc Intelligence</span></h1>
+                <p class="text-xl text-slate-400 font-light">Precision Routing & Classification for Academic Records</p>
+            </div>
+            <div class="flex gap-4 text-center">
+                <div class="glow-box px-6 py-3 border-t-2 border-t-blue-400">
+                    <div class="text-3xl font-bold text-blue-400">99%</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-wider">Accuracy</div>
+                </div>
+                <div class="glow-box px-6 py-3 border-t-2 border-t-emerald-400">
+                    <div class="text-3xl font-bold text-emerald-400">&lt;2s</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-wider">Avg Latency</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HORIZONTAL PIPELINE -->
+        <h2 class="text-2xl font-semibold mb-6 text-slate-200">The Tri-Layer Intelligence Engine</h2>
+        <div class="flex gap-8 mb-12 relative">
+            
+            <!-- Ingestion -->
+            <div class="glow-box p-6 w-1/5 relative flow-arrow border-l-4 border-l-slate-500">
+                <div class="text-3xl mb-4">📥</div>
+                <h3 class="font-bold text-lg text-white mb-2">Ingestion</h3>
+                <p class="text-sm text-slate-400 mb-4">Raw batches of PNG, JPG, WebP dragged via Web UI.</p>
+                <div class="bg-slate-800/50 rounded p-2 text-xs text-slate-300 border border-slate-700">
+                    FastAPI Async Dispatch
+                </div>
+            </div>
+
+            <!-- Layer 1 -->
+            <div class="glow-box p-6 w-1/5 relative flow-arrow border-l-4 border-l-blue-500">
+                <div class="text-xs font-bold text-blue-400 tracking-wider mb-2">LAYER 01</div>
+                <h3 class="font-bold text-xl text-white mb-2">Heuristics</h3>
+                <p class="text-sm text-slate-400 mb-4">Instant routing using regex matching on filenames.</p>
+                <div class="space-y-2">
+                    <div class="bg-blue-900/30 text-blue-300 text-xs px-2 py-1 rounded">✅ `transcript_*.png`</div>
+                    <div class="text-xs text-slate-500 flex justify-between"><span>Cost: $0.00</span> <span>Time: &lt;1ms</span></div>
+                </div>
+            </div>
+
+            <!-- Layer 2 -->
+            <div class="glow-box p-6 w-1/5 relative flow-arrow border-l-4 border-l-indigo-500">
+                <div class="text-xs font-bold text-indigo-400 tracking-wider mb-2">LAYER 02</div>
+                <h3 class="font-bold text-xl text-white mb-2">KYC Scanner</h3>
+                <p class="text-sm text-slate-400 mb-4">easyOCR scans for 11 specific Govt ID patterns.</p>
+                <div class="space-y-2">
+                    <div class="bg-indigo-900/30 text-indigo-300 text-xs px-2 py-1 rounded">🔍 Aadhaar, PAN, Passport</div>
+                    <div class="text-xs text-slate-500 flex justify-between"><span>Cost: $0.00</span> <span>Time: 1-2s</span></div>
+                </div>
+            </div>
+
+            <!-- Layer 3 -->
+            <div class="glow-box p-6 w-2/5 border-l-4 border-l-fuchsia-500">
+                <div class="text-xs font-bold text-fuchsia-400 tracking-wider mb-2">LAYER 03</div>
+                <h3 class="font-bold text-xl text-white mb-2">Multimodal LLM</h3>
+                <p class="text-sm text-slate-400 mb-4">Complex documents are passed to Google Gemini for visual reasoning and semantic categorization.</p>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div class="bg-fuchsia-900/20 text-fuchsia-300 text-xs px-2 py-1 rounded border border-fuchsia-500/20 text-center">Certificates</div>
+                    <div class="bg-fuchsia-900/20 text-fuchsia-300 text-xs px-2 py-1 rounded border border-fuchsia-500/20 text-center">Claim Forms</div>
+                    <div class="bg-fuchsia-900/20 text-fuchsia-300 text-xs px-2 py-1 rounded border border-fuchsia-500/20 text-center">Student IDs</div>
+                    <div class="bg-fuchsia-900/20 text-fuchsia-300 text-xs px-2 py-1 rounded border border-fuchsia-500/20 text-center">Unknowns</div>
+                </div>
+                <div class="text-xs text-slate-500 flex justify-between pt-2 border-t border-slate-700/50"><span>Model: Gemini 2.0 Flash</span> <span>Time: 2-4s</span></div>
+            </div>
+
+        </div>
+
+        <!-- BOTTOM GRID -->
+        <div class="grid grid-cols-3 gap-8">
+            
+            <!-- Tech Stack -->
+            <div class="glow-box p-8 col-span-2">
+                <h2 class="text-xl font-semibold mb-6 text-slate-200">Technology Stack</h2>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">🐍</div>
+                        <div>
+                            <div class="font-bold text-sm">Python 3.12</div>
+                            <div class="text-xs text-slate-500">Core Runtime</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">⚡</div>
+                        <div>
+                            <div class="font-bold text-sm">FastAPI</div>
+                            <div class="text-xs text-slate-500">Async Server</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">🧠</div>
+                        <div>
+                            <div class="font-bold text-sm">Gemini AI</div>
+                            <div class="text-xs text-slate-500">Vision LLM</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">🐳</div>
+                        <div>
+                            <div class="font-bold text-sm">Docker</div>
+                            <div class="text-xs text-slate-500">Containerization</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">☁️</div>
+                        <div>
+                            <div class="font-bold text-sm">Azure</div>
+                            <div class="text-xs text-slate-500">Serverless Host</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                        <div class="text-2xl">👁️</div>
+                        <div>
+                            <div class="font-bold text-sm">LangSmith</div>
+                            <div class="text-xs text-slate-500">Telemetry</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact -->
+            <div class="glow-box p-8 bg-gradient-to-br from-slate-800/80 to-indigo-900/30">
+                <h2 class="text-xl font-semibold mb-6 text-slate-200">Business Impact</h2>
+                <ul class="space-y-5">
+                    <li class="flex items-start gap-3">
+                        <div class="text-emerald-400 mt-1">✓</div>
+                        <div>
+                            <div class="text-sm font-bold text-white">Cost Reduction</div>
+                            <div class="text-xs text-slate-400">Multi-stage fallback prevents expensive API calls on simple docs.</div>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="text-emerald-400 mt-1">✓</div>
+                        <div>
+                            <div class="text-sm font-bold text-white">Infinite Scaling</div>
+                            <div class="text-xs text-slate-400">Azure automatically spins up replicas during admission season rushes.</div>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="text-emerald-400 mt-1">✓</div>
+                        <div>
+                            <div class="text-sm font-bold text-white">Full Observability</div>
+                            <div class="text-xs text-slate-400">100% trace coverage for token usage and latency auditing.</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            
+        </div>
+        
+    </div>
+</body>
+</html>

@@ -6,9 +6,9 @@ on:
   workflow_dispatch:      # allow manual trigger from GitHub UI
 
 env:
-  RESOURCE_GROUP: medishield-rg
-  ACR_NAME: medishieldacr27529
-  CONTAINER_APP_NAME: medishield-classifier
+  RESOURCE_GROUP: edudoc-ai-rg
+  ACR_NAME: edudoc-aiacr27529
+  CONTAINER_APP_NAME: edudoc-ai-classifier
   IMAGE_TAG: ${{ github.sha }}
 
 permissions:
@@ -109,7 +109,7 @@ jobs:
         run: |
           ENV_VARS="GOOGLE_API_KEY=secretref:google-api-key PYTHONUNBUFFERED=1"
           if [ -n "${{ secrets.LANGCHAIN_API_KEY }}" ]; then
-            ENV_VARS="$ENV_VARS LANGCHAIN_TRACING_V2=true LANGCHAIN_API_KEY=secretref:langchain-api-key LANGCHAIN_PROJECT=medishield-classification"
+            ENV_VARS="$ENV_VARS LANGCHAIN_TRACING_V2=true LANGCHAIN_API_KEY=secretref:langchain-api-key LANGCHAIN_PROJECT=edudoc-ai-classification"
           fi
           az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \

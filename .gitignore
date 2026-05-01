@@ -8,10 +8,27 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Secrets — NEVER commit
 .env
+
+# IDE / editor
 .vscode
 .claude/
+.idea/
 
-# Local-only documents — not for version control
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Test images (binary files, not for version control)
+test_images/
+
+# Local-only scripts / documents
 linkedin_post.md
 presentation_script.md
+generate_prd.py
+
+# Pytest cache
+.pytest_cache/

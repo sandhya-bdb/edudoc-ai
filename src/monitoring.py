@@ -1,5 +1,5 @@
 """
-LangSmith observability for the MediShield classification pipeline.
+LangSmith observability for the EduDoc AI classification pipeline.
 
 Each pipeline stage is wrapped with @traceable so LangSmith records:
   - inputs / outputs per stage
@@ -10,7 +10,7 @@ Each pipeline stage is wrapped with @traceable so LangSmith records:
 Required env vars:
   LANGCHAIN_TRACING_V2=true
   LANGCHAIN_API_KEY=<your-langsmith-key>
-  LANGCHAIN_PROJECT=medishield-classification
+  LANGCHAIN_PROJECT=edudoc-ai-classification
 """
 
 import logging
@@ -33,9 +33,9 @@ def trace_rules_engine(filename: str, doc_type: str | None, send_to_llm: bool) -
     }
 
 
-@traceable(name="kyc-ocr", run_type="tool", tags=["stage:ocr"])
-def trace_kyc_ocr(filename: str, doc_type: str | None, send_to_llm: bool, ocr_text: str) -> dict:
-    """Record the KYC OCR decision in LangSmith."""
+@traceable(name="edu-ocr", run_type="tool", tags=["stage:ocr"])
+def trace_edu_ocr(filename: str, doc_type: str | None, send_to_llm: bool, ocr_text: str) -> dict:
+    """Record the EDU OCR decision in LangSmith."""
     return {
         "filename": filename,
         "doc_type": doc_type,
