@@ -452,30 +452,45 @@ This single script provisions **all** Azure resources:
 
 Deletes the entire resource group and all associated Azure resources.
 
-### CI/CD with GitHub Actions
+## 🚀 CI/CD Setup (GitHub Actions)
 
-The `.github/workflows/deploy.yml` pipeline runs automatically on every push to `main`:
+The project includes a robust CI/CD pipeline that automatically tests, builds, and deploys your application to Azure on every push to `main`.
 
+### 1. Azure Authentication (OIDC)
+We use OpenID Connect (OIDC) so no long-lived secrets are stored in GitHub. Run these commands locally:
+
+```bash
+# 1. Create an Azure Service Principal
+az ad sp create-for-rbac --name "github-actions-edudoc" --role contributor \
+  --scopes /subscriptions/$(az account show --query id -o tsv)/resourceGroups/edudoc-ai-rg \
+  --sdk-auth
+
+# 2. Set up Federated Identity (Replace <APP_ID> and <REPO_PATH>)
+# REPO_PATH format: "username/repo"
+az ad app federated-credential create --id <APPLICATION_ID> --parameters '{
+  "name": "github-actions-deploy",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:<REPO_PATH>:environment:production",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
 ```
-push to main
-     │
-     ├── Run pytest (33 tests)
-     │
-     ├── docker build --platform linux/amd64
-     │
-     ├── docker push → Azure Container Registry
-     │
-     └── az containerapp update → Live in ~2 minutes
-```
 
-**Required GitHub Secrets:**
+### 2. Configure GitHub Secrets
+Add the following to your GitHub Repository (**Settings > Secrets and variables > Actions**):
 
 | Secret | Description |
 |--------|-------------|
-| `AZURE_CREDENTIALS` | Service principal JSON from `az ad sp create-for-rbac` |
-| `GOOGLE_API_KEY` | Google AI Studio API key |
-| `LANGCHAIN_API_KEY` | LangSmith API key (optional) |
-| `ACR_NAME` | Your container registry name |
+| `AZURE_CLIENT_ID` | Application ID from Step 1 |
+| `AZURE_TENANT_ID` | Directory (tenant) ID |
+| `AZURE_SUBSCRIPTION_ID` | Your Azure Subscription ID |
+| `GOOGLE_API_KEY` | Your Google Gemini API Key |
+| `LANGCHAIN_API_KEY` | (Optional) LangSmith API key |
+
+### 3. Pipeline Features
+- ✅ **Automated Testing**: Runs `pytest` with `uv` on every PR and Push.
+- 🐳 **Smoke Test**: Starts the Docker container in the GitHub runner to verify `/health` before deployment.
+- 🚀 **Zero-Downtime Deploy**: Rolling updates to Azure Container Apps.
+- 🧪 **Live Functional Test**: Verifies the deployed endpoint by processing a real document from the repo.
 
 ---
 

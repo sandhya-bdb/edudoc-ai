@@ -7,7 +7,7 @@ on:
 
 env:
   RESOURCE_GROUP: edudoc-ai-rg
-  ACR_NAME: edudoc-aiacr27529
+  ACR_NAME: edudocaiacr18970
   CONTAINER_APP_NAME: edudoc-ai-classifier
   IMAGE_TAG: ${{ github.sha }}
 
@@ -134,11 +134,13 @@ jobs:
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query "properties.configuration.ingress.fqdn" -o tsv)
-          SAMPLE=$(ls dataset/*.png 2>/dev/null | head -1)
+          # Look for any png/jpg/jpeg in the repo to use as a test file
+          SAMPLE=$(find . -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) | head -1)
           if [ -z "$SAMPLE" ]; then
-            echo "No sample image in dataset/, skipping functional test"
+            echo "No sample image found in repo, skipping functional test"
             exit 0
           fi
+          echo "Using $SAMPLE for functional test"
           HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
             -X POST "https://$APP_URL/classify" -F "files=@$SAMPLE")
           if [ "$HTTP_CODE" != "200" ]; then
@@ -148,6 +150,7 @@ jobs:
           fi
           echo "✅ /classify returned 200"
           cat /tmp/resp.json
+
 
       - name: Print app URL
         run: |
