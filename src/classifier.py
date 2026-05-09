@@ -37,9 +37,11 @@ def classify(
 ) -> ClassificationResult:
     """Run a single image through the full classification pipeline."""
     start = time.monotonic()
+    print(f"\nProcessing: {filename}")
 
     # Stage 1 — rules engine (filename-based, no ML)
     rules_result = apply_rules(filename)
+    print(f"[RULES] type={rules_result.doc_type}, send_to_llm={rules_result.send_to_llm}")
     trace_rules_engine(
         filename=filename,
         doc_type=rules_result.doc_type,
@@ -58,6 +60,7 @@ def classify(
 
     # Stage 2 — EDU OCR detector
     edu_result = detect_edu(filename, image_bytes, reader=ocr_reader)
+    print(f"[OCR] type={edu_result.doc_type}, send_to_llm={edu_result.send_to_llm}")
     trace_edu_ocr(
         filename=filename,
         doc_type=edu_result.doc_type,
@@ -76,24 +79,49 @@ def classify(
         return result
 
     # Stage 3 — Gemini LLM classifier
-    llm_result = classify_with_llm(filename, image_bytes, client=llm_client)
-    trace_llm_classify(
-        filename=filename,
-        sub_type=llm_result.sub_type,
-        input_tokens=llm_result.input_tokens,
-        output_tokens=llm_result.output_tokens,
-        raw_response=llm_result.raw_response,
-    )
-    result = ClassificationResult(
-        filename=filename,
-        doc_type=llm_result.doc_type,
-        sub_type=llm_result.sub_type,
-        method="llm",
-        latency_ms=int((time.monotonic() - start) * 1000),
-        input_tokens=llm_result.input_tokens,
-        output_tokens=llm_result.output_tokens,
-    )
+    # Stage 3 — Gemini LLM classifier
+    try:
+        llm_result = classify_with_llm(
+            filename,
+            image_bytes,
+            client=llm_client,
+        )
+        print(f"[LLM] success -> {llm_result.sub_type}")
+        trace_llm_classify(
+            filename=filename,
+            sub_type=llm_result.sub_type,
+            input_tokens=llm_result.input_tokens,
+            output_tokens=llm_result.output_tokens,
+            raw_response=llm_result.raw_response,
+        )
+
+        result = ClassificationResult(
+            filename=filename,
+            doc_type=llm_result.doc_type,
+            sub_type=llm_result.sub_type,
+            method="llm",
+            latency_ms=int((time.monotonic() - start) * 1000),
+            input_tokens=llm_result.input_tokens,
+            output_tokens=llm_result.output_tokens,
+        )
+
+    except Exception as e:
+        result = ClassificationResult(
+            filename=filename,
+            doc_type="image",
+            sub_type="Manual review required",
+            method="llm",
+            latency_ms=int((time.monotonic() - start) * 1000),
+        )
+        print(f"[LLM ERROR] {filename}: {e}")
     trace_classify(**result.__dict__)
+    print(
+    f"[DONE] {filename} | "
+    f"type={result.doc_type} | "
+    f"sub_type={result.sub_type} | "
+    f"method={result.method} | "
+    f"latency={result.latency_ms}ms"
+)
     return result
 
 

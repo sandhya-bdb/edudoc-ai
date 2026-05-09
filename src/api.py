@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from functools import partial
+import gc
 
 import easyocr
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -18,12 +19,20 @@ from src.classifier import classify
 
 load_dotenv()
 
+# Workaround for macOS SSL certificate verification failures
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
 ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
 
 # Cap how many documents are classified concurrently per request.
-# Tuned for a 4 GiB replica: each easyocr + Gemini call can spike to ~400-600 MB,
-# so >5 in flight risks OOM. Override with CLASSIFY_CONCURRENCY env var.
-MAX_CONCURRENT_CLASSIFICATIONS = int(os.environ.get("CLASSIFY_CONCURRENCY", "5"))
+# For MacBook Air / 4 GiB systems, 1-2 is recommended to prevent OOM/freezing.
+MAX_CONCURRENT_CLASSIFICATIONS = int(os.environ.get("CLASSIFY_CONCURRENCY", "1"))
 
 # ── metrics store (in-memory, reset on restart) ───────────────────────────────
 _metrics: dict = {
@@ -42,16 +51,18 @@ _llm_client: genai.Client | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _ocr_reader, _llm_client
-    _ocr_reader = easyocr.Reader(["en"], gpu=False)
-    _llm_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    # Models are now lazy-loaded inside the classification loop to save startup memory
     yield
-    # cleanup (nothing needed for these clients)
+    # cleanup
+    global _ocr_reader, _llm_client
+    _ocr_reader = None
+    _llm_client = None
+    gc.collect()
 
 
 app = FastAPI(
-    title="MediShield Document Classifier",
-    description="Classifies scanned insurance documents using rules, OCR, and Gemini LLM.",
+    title="Educational Document Classifier API",
+    description="Classifies educational documents using OCR and LLMs.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -102,6 +113,13 @@ async def classify_documents(files: list[UploadFile] = File(...)):
     # Read all file bytes concurrently first
     contents = await asyncio.gather(*[f.read() for f in files])
 
+    global _ocr_reader, _llm_client
+    # Initialize models sequentially before spawning concurrent tasks to avoid race conditions
+    if _ocr_reader is None:
+        _ocr_reader = easyocr.Reader(["en"], gpu=False)
+    if _llm_client is None:
+        _llm_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+
     loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(MAX_CONCURRENT_CLASSIFICATIONS)
 
@@ -131,5 +149,8 @@ async def classify_documents(files: list[UploadFile] = File(...)):
             _metrics["by_method"][result.method] = _metrics["by_method"].get(result.method, 0) + 1
             _metrics["by_doc_type"][result.doc_type] = _metrics["by_doc_type"].get(result.doc_type, 0) + 1
             yield json.dumps(asdict(result)) + "\n"
+            
+            # Force cleanup after each document to help low-memory systems
+            gc.collect()
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")

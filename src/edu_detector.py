@@ -17,6 +17,13 @@ _EDU_PATTERNS = [
     re.compile(r"\bacademic\s+record\b", re.IGNORECASE),
     re.compile(r"\bbachelor\b", re.IGNORECASE),
     re.compile(r"\bmaster\b", re.IGNORECASE),
+    re.compile(r"\bboard\b", re.IGNORECASE),
+    re.compile(r"\bsecondary\b", re.IGNORECASE),
+    re.compile(r"\bmarksheet\b", re.IGNORECASE),
+    re.compile(r"\bresult\b", re.IGNORECASE),
+    re.compile(r"\bcertificate\b", re.IGNORECASE),
+    re.compile(r"\baadhaar\b", re.IGNORECASE),
+    re.compile(r"\bindia\b", re.IGNORECASE),
 ]
 
 
