@@ -22,9 +22,25 @@ _EDU_PATTERNS = [
     re.compile(r"\bmarksheet\b", re.IGNORECASE),
     re.compile(r"\bresult\b", re.IGNORECASE),
     re.compile(r"\bcertificate\b", re.IGNORECASE),
-    re.compile(r"\baadhaar\b", re.IGNORECASE),
-    re.compile(r"\bindia\b", re.IGNORECASE),
 ]
+
+
+from PIL import Image
+import io
+
+def _preprocess_image(image_bytes: bytes, max_dim: int = 1024) -> bytes:
+    """Resize image to speed up OCR while maintaining enough quality for classification."""
+    with Image.open(io.BytesIO(image_bytes)) as img:
+        # Calculate aspect ratio
+        ratio = max_dim / max(img.size)
+        if ratio < 1.0:
+            new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+        # Convert back to bytes
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='JPEG', quality=85)
+        return img_byte_arr.getvalue()
 
 
 @dataclass
@@ -52,8 +68,11 @@ from langsmith import traceable
 @traceable(name="edu-ocr", run_type="tool", tags=["stage:ocr"])
 def detect_edu(filename: str, image_bytes: bytes, reader: easyocr.Reader | None = None) -> EduResult:
     """Run OCR on image bytes and determine if the document is an educational document."""
+    # Preprocess (resize) to speed up OCR
+    processed_bytes = _preprocess_image(image_bytes)
+    
     r = reader if reader is not None else _get_reader()
-    results = r.readtext(image_bytes, detail=0)
+    results = r.readtext(processed_bytes, detail=0)
     from src.privacy import mask_pii
     full_text = mask_pii(" ".join(results))
 
