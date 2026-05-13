@@ -30,17 +30,22 @@ import io
 
 def _preprocess_image(image_bytes: bytes, max_dim: int = 1024) -> bytes:
     """Resize image to speed up OCR while maintaining enough quality for classification."""
-    with Image.open(io.BytesIO(image_bytes)) as img:
-        # Calculate aspect ratio
-        ratio = max_dim / max(img.size)
-        if ratio < 1.0:
-            new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-            
-        # Convert back to bytes
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='JPEG', quality=85)
-        return img_byte_arr.getvalue()
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            # Calculate aspect ratio
+            ratio = max_dim / max(img.size)
+            if ratio < 1.0:
+                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+                
+            # Convert back to bytes
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='JPEG', quality=85)
+            return img_byte_arr.getvalue()
+    except Exception:
+        # If image is corrupt or not an image (e.g. in tests), return original bytes
+        # and let Stage 2/3 handle the failure gracefully.
+        return image_bytes
 
 
 @dataclass
