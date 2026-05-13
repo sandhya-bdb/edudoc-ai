@@ -54,6 +54,7 @@ Instead of staff manually reviewing every uploaded scan, EduDoc AI processes it 
 | ⚡ **Streaming API** | Results stream via NDJSON as each document is classified |
 | 📊 **Built-in Metrics** | `/metrics` endpoint tracks token usage, method breakdown, and doc types |
 | 🔭 **Full Observability** | Every pipeline run traced in LangSmith with latency and token data |
+| 🛡️ **PII Guardrails** | Automated regex-based redaction of emails, phones, and IDs before LLM/logging |
 | 🐳 **CPU-Only Container** | No GPU required — runs on standard Azure Container Apps instances |
 | 🖥 **Modern UI** | Drag-and-drop dark-mode frontend with real-time results |
 
@@ -123,8 +124,9 @@ graph TB
     API --> Rules
     Rules -->|"match"| Result
     Rules -->|"no match"| OCR
-    OCR -->|"keywords found"| Result
-    OCR -->|"no keywords"| LLM
+    OCR -->|"mask pii"| Privacy["🛡️ Privacy Layer<br/>(Regex Redaction)"]
+    Privacy -->|"keywords found"| Result
+    Privacy -->|"no keywords"| LLM
     LLM --> Result
     Result --> Client
     API -.->|"@traceable"| Monitor
@@ -170,7 +172,8 @@ sequenceDiagram
         alt edu keywords found
             O-->>F: doc_type=education
         else no keywords
-            F->>G: classify_with_llm(image_bytes)
+            F->>F: mask_pii(ocr_text)
+            F->>G: classify_with_llm(masked_text)
             G-->>F: sub_type + token usage
             F-->>L: trace_llm_classify()
         end
@@ -185,36 +188,19 @@ sequenceDiagram
 
 ```
 edusmart/
-├── 📂 src/
+├── src/
 │   ├── api.py               # FastAPI app — /classify, /health, /metrics endpoints
+│   ├── privacy.py           # Lightweight PII masking (regex redaction)
 │   ├── classifier.py        # Pipeline orchestrator (calls all 3 stages)
-│   ├── rules_engine.py      # Stage 1: filename regex matching
-│   ├── edu_detector.py      # Stage 2: EasyOCR + educational keyword detection
-│   ├── llm_classifier.py    # Stage 3: Gemini multimodal LLM classification
-│   └── monitoring.py        # LangSmith @traceable wrappers for all stages
-│
-├── 📂 frontend/
-│   └── index.html           # Single-file drag-and-drop UI (dark mode, glassmorphism)
-│
-├── 📂 tests/
+...
+├── tests/
+│   ├── test_privacy.py      # PII masking unit tests
 │   ├── test_api.py          # FastAPI endpoint integration tests
-│   ├── test_rules_engine.py # Unit tests for filename rules
-│   ├── test_edu_detector.py # Unit tests for OCR keyword detection
-│   └── test_llm_classifier.py # LLM classifier tests (mocked)
-│
-├── 📂 infra/
-│   ├── deploy.sh            # One-shot Azure Container Apps deployment script
-│   ├── teardown.sh          # Delete all Azure resources (clean slate)
-│   └── DEPLOYMENT.md        # Detailed deployment reference
-│
-├── 📂 .github/
-│   └── workflows/deploy.yml # CI/CD: test → build → push → deploy on push to main
-│
-├── Dockerfile               # Multi-stage CPU-only build (python:3.12-slim)
-├── pyproject.toml           # Dependencies + CPU-only PyTorch index config
-├── uv.lock                  # Locked dependency resolution
+...
 ├── edudoc_infographic.html  # Visual system architecture infographic
-└── .env                     # API keys (never committed to git)
+├── .env                     # API keys (never committed to git)
+└── .env.example             # Template for local development environment
+
 ```
 
 ---
@@ -377,6 +363,26 @@ A single-file self-contained interface at `frontend/index.html`, served directly
 
 ---
 
+## 🔒 Security & Privacy
+
+Educational documents are highly sensitive. EduDoc AI implements multiple layers of protection to ensure data privacy:
+
+### 1. PII Redaction (Privacy Layer)
+All text extracted via OCR passes through a lightweight regex-based **Privacy Layer** ([src/privacy.py](file:///Users/sandhyabantiduttaborah/Desktop/edusmart/src/privacy.py)) before being logged or sent to external APIs.
+*   **Redacted Fields**: Emails, Phone Numbers, Student IDs (9-16 digits), and Dates of Birth.
+*   **Performance**: Processed in < 50ms using optimized regex, avoiding heavy NLP dependencies.
+
+### 2. LLM Safety Guardrails
+*   **Safety Settings**: Gemini is configured with `BLOCK_MEDIUM_AND_ABOVE` thresholds for harassment, hate speech, and dangerous content.
+*   **Privacy Prompting**: The system prompt explicitly instructs the model to ignore personally identifiable information and focus solely on document structure.
+
+### 3. API Hardening
+*   **CORS Protection**: Access can be restricted to specific frontend domains via the `ALLOWED_ORIGINS` environment variable.
+*   **Security Headers**: Automated inclusion of `HSTS`, `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff`.
+*   **Zero-Retention**: Documents are processed in-memory and never written to disk or persistent storage.
+
+---
+
 ## 🔭 Observability with LangSmith
 
 Every document classification is traced end-to-end in [LangSmith](https://smith.langchain.com/). You get:
@@ -503,6 +509,7 @@ Add the following to your GitHub Repository (**Settings > Secrets and variables 
 | `LANGCHAIN_API_KEY` | ❌ No | — | LangSmith API key |
 | `LANGCHAIN_PROJECT` | ❌ No | `edudoc-ai-classification` | LangSmith project name |
 | `CLASSIFY_CONCURRENCY` | ❌ No | `5` | Max parallel classifications per request |
+| `ALLOWED_ORIGINS` | ❌ No | `*` | Comma-separated list of allowed CORS origins |
 
 ---
 
