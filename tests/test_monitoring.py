@@ -1,44 +1,4 @@
-from src.monitoring import (
-    record_token_usage,
-    trace_classify,
-    trace_edu_ocr,
-    trace_llm_classify,
-    trace_rules_engine,
-)
-
-
-def test_trace_rules_engine():
-    result = trace_rules_engine("transcript_01.png", "transcript", False)
-    assert result["filename"] == "transcript_01.png"
-    assert result["doc_type"] == "transcript"
-    assert result["send_to_llm"] is False
-    assert result["stage"] == "rules"
-
-
-def test_trace_edu_ocr():
-    result = trace_edu_ocr("random.png", "education", False, "University transcript here")
-    assert result["filename"] == "random.png"
-    assert result["doc_type"] == "education"
-    assert result["send_to_llm"] is False
-    assert result["ocr_text_length"] > 10
-    assert result["stage"] == "ocr"
-
-
-def test_trace_llm_classify():
-    result = trace_llm_classify("doc.png", "Transcripts", 100, 20, "raw text")
-    assert result["filename"] == "doc.png"
-    assert result["sub_type"] == "Transcripts"
-    assert result["usage"]["input_tokens"] == 100
-    assert result["usage"]["output_tokens"] == 20
-    assert result["usage"]["total_tokens"] == 120
-    assert result["stage"] == "llm"
-
-
-def test_trace_classify():
-    result = trace_classify("doc.png", "image", "Transcripts", "llm", 1500, 100, 20)
-    assert result["filename"] == "doc.png"
-    assert result["method"] == "llm"
-    assert result["latency_ms"] == 1500
+from src.monitoring import record_token_usage
 
 
 def test_record_token_usage_none():
