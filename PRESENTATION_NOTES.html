@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDoc AI - Detailed Presentation Notes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #6366f1;
+            --text: #1f2937;
+            --light-text: #6b7280;
+            --bg: #ffffff;
+            --code-bg: #f3f4f6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            line-height: 1.6; 
+            color: var(--text); 
+            background: #f4f7fe;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 50px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        }
+
+        header {
+            border-bottom: 4px solid var(--primary);
+            padding-bottom: 25px;
+            margin-bottom: 40px;
+        }
+
+        h1 { font-size: 2.8rem; color: var(--primary); margin-bottom: 5px; letter-spacing: -0.02em; }
+        h2 { font-size: 1.6rem; color: var(--secondary); margin: 40px 0 20px; border-left: 5px solid var(--primary); padding-left: 15px; }
+        h3 { font-size: 1.3rem; margin: 25px 0 10px; color: #111; display: flex; align-items: center; }
+
+        p { margin-bottom: 18px; font-size: 1.05rem; color: #374151; }
+        ul { margin-bottom: 20px; padding-left: 25px; }
+        li { margin-bottom: 12px; }
+
+        .explain-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-style: italic;
+            color: #475569;
+            position: relative;
+        }
+        .explain-box::before {
+            content: "How to explain:";
+            display: block;
+            font-weight: 700;
+            font-style: normal;
+            color: var(--primary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .key-points {
+            background: #eef2ff;
+            border: 1px dashed #6366f1;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .file-badge {
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+
+        .footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--light-text);
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; border: none; width: 100%; max-width: 100%; padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>EduDoc AI</h1>
+        <p style="font-size: 1.2rem; color: var(--light-text); font-weight: 500;">Presentation Master-Notes & Technical Breakdown</p>
+    </header>
+
+    <div class="no-print" style="background: #fff7ed; border: 1px solid #ffedd5; padding: 15px; border-radius: 8px; margin-bottom: 30px; color: #9a3412;">
+        <strong>🖨️ PDF Export:</strong> Open this file in your browser and press <code>Cmd + P</code> to save as a professional PDF.
+    </div>
+
+    <h2>Core Technical Deep-Dive</h2>
+
+    <!-- SECTION A -->
+    <section>
+        <h3>A. The 3-Stage Classification Pipeline <span class="file-badge">classifier.py</span></h3>
+        <div class="explain-box">
+            "This is the brain of the project. Instead of sending every document to an expensive LLM, we use a Cascade Architecture."
+        </div>
+        <div class="key-points">
+            <strong>Key Points:</strong>
+            <ul>
+                <li><strong>Stage 1: Rules Engine (Fastest)</strong> – Checks filenames for prefixes like <code>cert_</code> or <code>transcript_</code>. Cost: $0, Latency: &lt;1ms.</li>
+                <li><strong>Stage 2: Local OCR (Moderate)</strong> – Uses EasyOCR to scan for educational keywords (e.g., "University", "Degree"). Cost: $0 (local), Latency: ~1-2s.</li>
+                <li><strong>Stage 3: Generative AI (Powerhouse)</strong> – If the first two fail, we use Google Gemini Pro Vision to "look" at the document and understand its context. Cost: Low (pay-per-use), Latency: ~2-3s.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- SECTION B -->
+    <section>
+        <h3>B. High-Concurrency API with Memory Safety <span class="file-badge">api.py</span></h3>
+        <div class="explain-box">
+            "We built the backend with FastAPI and Asynchronous Python. We specifically optimized it for hardware with limited memory (like a MacBook Air)."
+        </div>
+        <div class="key-points">
+            <strong>Key Points:</strong>
+            <ul>
+                <li><strong>Semaphore Control (Line 124):</strong> We use <code>asyncio.Semaphore</code> to limit how many documents are processed at once. This prevents the server from crashing if a user uploads 100 images at once.</li>
+                <li><strong>Streaming Responses (Line 156):</strong> Instead of making the user wait for all files to finish, we "stream" the results back to the browser one by one as they are ready.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- SECTION C -->
+    <section>
+        <h3>C. Modern UI & User Experience <span class="file-badge">index.html</span></h3>
+        <div class="explain-box">
+            "The frontend is a lightweight, responsive SPA (Single Page Application) that provides real-time feedback."
+        </div>
+        <div class="key-points">
+            <strong>Key Points:</strong>
+            <ul>
+                <li><strong>Glassmorphism Design:</strong> Uses modern CSS backdrops and gradients for a premium "Apple-like" feel.</li>
+                <li><strong>NDJSON Handling:</strong> The Javascript handles the streaming backend response, updating the UI row-by-row as classification happens.</li>
+            </ul>
+        </div>
+    </section>
+
+    <h2>Presentation Strategy Tips</h2>
+    <p>When presenting these sections, use the <strong>"Architecture First, Code Second"</strong> approach:</p>
+    <ol>
+        <li>Show the <strong>Diagram</strong> from the implementation plan.</li>
+        <li>Explain the <strong>Logic</strong> using the notes above.</li>
+        <li>Show the <strong>Code File</strong> and point to the specific lines mentioned (e.g., Line 124 in api.py).</li>
+    </ol>
+
+    <div class="footer">
+        EduDoc AI Project Notes &copy; 2026<br>
+        Developed for professional presentation.
+    </div>
+</div>
+
+</body>
+</html>

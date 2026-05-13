@@ -48,6 +48,14 @@ def _parse_category(text: str) -> str:
 from langsmith import traceable
 
 
+# Safety settings to block harmful content
+SAFETY_SETTINGS = [
+    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_MEDIUM_AND_ABOVE"),
+    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_MEDIUM_AND_ABOVE"),
+    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_MEDIUM_AND_ABOVE"),
+    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_MEDIUM_AND_ABOVE"),
+]
+
 @traceable(name="llm-classify", run_type="llm", tags=["stage:llm"], metadata={"model": MODEL})
 def classify_with_llm(
     filename: str,
@@ -59,12 +67,23 @@ def classify_with_llm(
     if client is None:
         client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
+    # Augmented prompt with privacy instructions
+    privacy_prompt = (
+        PROMPT + "\n\n"
+        "IMPORTANT: Ignore all personally identifiable information (PII) like names, "
+        "IDs, or addresses. Use only the document structure and headers to classify."
+    )
+
     response = client.models.generate_content(
         model=MODEL,
         contents=[
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            types.Part.from_text(text=PROMPT),
+            types.Part.from_text(text=privacy_prompt),
         ],
+        config=types.GenerateContentConfig(
+            safety_settings=SAFETY_SETTINGS,
+            temperature=0.0,  # Deterministic for classification
+        )
     )
 
     raw = response.text or ""

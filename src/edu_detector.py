@@ -54,7 +54,8 @@ def detect_edu(filename: str, image_bytes: bytes, reader: easyocr.Reader | None 
     """Run OCR on image bytes and determine if the document is an educational document."""
     r = reader if reader is not None else _get_reader()
     results = r.readtext(image_bytes, detail=0)
-    full_text = " ".join(results)
+    from src.privacy import mask_pii
+    full_text = mask_pii(" ".join(results))
 
     if _is_edu(full_text):
         return EduResult(filename=filename, doc_type="education", send_to_llm=False, ocr_text=full_text)

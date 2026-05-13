@@ -67,12 +67,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Security: Restrict origins in production (e.g., ["https://edudoc.yourdomain.com"])
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["POST", "GET"], # Restrict to required methods
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
