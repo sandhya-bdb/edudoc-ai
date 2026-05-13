@@ -46,6 +46,10 @@ def _is_edu(text: str) -> bool:
     return any(pattern.search(text) for pattern in _EDU_PATTERNS)
 
 
+from langsmith import traceable
+
+
+@traceable(name="edu-ocr", run_type="tool", tags=["stage:ocr"])
 def detect_edu(filename: str, image_bytes: bytes, reader: easyocr.Reader | None = None) -> EduResult:
     """Run OCR on image bytes and determine if the document is an educational document."""
     r = reader if reader is not None else _get_reader()

@@ -12,6 +12,10 @@ class RulesResult:
     send_to_llm: bool
 
 
+from langsmith import traceable
+
+
+@traceable(name="rules-engine", run_type="tool", tags=["stage:rules"])
 def apply_rules(filename: str) -> RulesResult:
     """Apply filename-based rules before any ML processing."""
     name = filename.split("/")[-1].split("\\")[-1]

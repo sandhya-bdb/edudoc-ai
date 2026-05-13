@@ -38,11 +38,9 @@ COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser frontend/ ./frontend/
 
-# Pre-download easyocr models as appuser
+# Models will be downloaded at runtime on first use to keep the image light
 USER appuser
 ENV EASYOCR_MODULE_PATH="/home/appuser/.EasyOCR"
-RUN /app/.venv/bin/python -c "import easyocr; easyocr.Reader(['en'], gpu=False)" \
-    && echo "easyocr models downloaded"
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

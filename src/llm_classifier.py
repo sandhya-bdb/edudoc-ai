@@ -45,6 +45,10 @@ def _parse_category(text: str) -> str:
     return "Unknown"
 
 
+from langsmith import traceable
+
+
+@traceable(name="llm-classify", run_type="llm", tags=["stage:llm"], metadata={"model": MODEL})
 def classify_with_llm(
     filename: str,
     image_bytes: bytes,
@@ -71,6 +75,16 @@ def classify_with_llm(
     if response.usage_metadata:
         input_tokens = response.usage_metadata.prompt_token_count or 0
         output_tokens = response.usage_metadata.candidates_token_count or 0
+
+    # Set usage metadata for LangSmith cost calculation
+    from langsmith.run_helpers import get_current_run_tree
+    run_tree = get_current_run_tree()
+    if run_tree:
+        run_tree.metadata["usage"] = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        }
 
     return LLMResult(
         filename=filename,
