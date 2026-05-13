@@ -1,0 +1,8 @@
+# Mark HTML files as documentation or ignore them in language statistics
+*.html linguist-documentation
+frontend/index.html linguist-documentation
+edudoc_infographic.html linguist-documentation
+PRESENTATION_NOTES.html linguist-documentation
+
+# Ensure .py files are the primary language
+*.py linguist-detectable
